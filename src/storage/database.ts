@@ -1,5 +1,5 @@
-import { seedRecords, seedTasks } from '../data/seed';
-import type { AppData, DocumentItem, LifeRecord, Recipe, TaskItem } from '../types';
+import { seedDocuments, seedRecipes, seedTasks } from '../data/seed';
+import type { AppData, DocumentItem, Recipe, TaskItem } from '../types';
 
 const DATABASE_NAME = 'life-manual';
 const DATABASE_VERSION = 3;
@@ -8,6 +8,18 @@ const ATTACHMENTS_STORE = 'attachments';
 const RECIPES_STORE = 'recipes';
 const DOCUMENTS_STORE = 'documents';
 const TASKS_STORE = 'tasks';
+
+interface LegacyRecord {
+  id: string;
+  kind: '菜品' | '维修' | '文件' | '图片' | '通用';
+  title: string;
+  detail: string;
+  date: string;
+  createdAt: number;
+  ingredients?: string[];
+  attachmentName?: string;
+  hasFile?: boolean;
+}
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -36,11 +48,11 @@ function complete(transaction: IDBTransaction): Promise<void> {
   });
 }
 
-function toRecipe(record: LifeRecord): Recipe {
+function toRecipe(record: LegacyRecord): Recipe {
   return { id: record.id, title: record.title.replace(/ ·.*/, ''), notes: record.detail, ingredients: record.ingredients || [], category: '家常菜', date: record.date, createdAt: record.createdAt, attachmentName: record.attachmentName, hasFile: record.hasFile };
 }
 
-function toDocument(record: LifeRecord): DocumentItem {
+function toDocument(record: LegacyRecord): DocumentItem {
   const category = record.kind === '维修' ? '家庭与房屋' : record.kind === '文件' ? '发票与保修' : '其他';
   return { id: record.id, title: record.title, description: record.detail, category, important: record.kind === '文件', date: record.date, createdAt: record.createdAt, attachmentName: record.attachmentName, hasFile: record.hasFile, isImage: record.kind === '图片' };
 }
@@ -53,10 +65,9 @@ export async function loadAppData(): Promise<AppData> {
     requestResult(database.transaction(TASKS_STORE).objectStore(TASKS_STORE).getAll()) as Promise<TaskItem[]>,
   ]);
   if (!recipes.length && !documents.length) {
-    let legacy = await requestResult(database.transaction(RECORDS_STORE).objectStore(RECORDS_STORE).getAll()) as LifeRecord[];
-    if (!legacy.length) legacy = seedRecords;
-    recipes = legacy.filter((item) => item.kind === '菜品').map(toRecipe);
-    documents = legacy.filter((item) => item.kind !== '菜品').map(toDocument);
+    const legacy = await requestResult(database.transaction(RECORDS_STORE).objectStore(RECORDS_STORE).getAll()) as LegacyRecord[];
+    recipes = legacy.length ? legacy.filter((item) => item.kind === '菜品').map(toRecipe) : [...seedRecipes];
+    documents = legacy.length ? legacy.filter((item) => item.kind !== '菜品').map(toDocument) : [...seedDocuments];
     const transaction = database.transaction([RECIPES_STORE, DOCUMENTS_STORE], 'readwrite');
     recipes.forEach((item) => transaction.objectStore(RECIPES_STORE).put(item));
     documents.forEach((item) => transaction.objectStore(DOCUMENTS_STORE).put(item));
@@ -96,33 +107,6 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
-  });
-}
-
-export async function loadRecords(): Promise<LifeRecord[]> {
-  const database = await openDatabase();
-  let records = await requestResult(database.transaction(RECORDS_STORE).objectStore(RECORDS_STORE).getAll()) as LifeRecord[];
-  if (!records.length) {
-    const transaction = database.transaction(RECORDS_STORE, 'readwrite');
-    seedRecords.forEach((record) => transaction.objectStore(RECORDS_STORE).put(record));
-    await new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error);
-    });
-    records = [...seedRecords];
-  }
-  return records.sort((a, b) => b.createdAt - a.createdAt);
-}
-
-export async function insertRecord(record: LifeRecord, file?: File): Promise<void> {
-  const database = await openDatabase();
-  const stores = file ? [RECORDS_STORE, ATTACHMENTS_STORE] : [RECORDS_STORE];
-  const transaction = database.transaction(stores, 'readwrite');
-  transaction.objectStore(RECORDS_STORE).put(record);
-  if (file) transaction.objectStore(ATTACHMENTS_STORE).put(file, record.id);
-  await new Promise<void>((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
   });
 }
 
