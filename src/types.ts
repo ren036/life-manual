@@ -7,6 +7,7 @@ export interface LifeRecord {
   title: string;
   detail: string;
   date: string;
+  createdAt: number;
   ingredients?: string[];
   attachmentName?: string;
   hasFile?: boolean;

@@ -24,7 +24,7 @@ export function AddRecordSheet({ open, initialKind, onClose, onSave }: Props) {
   async function submit() {
     if (!title.trim()) return;
     const record: LifeRecord = {
-      id: crypto.randomUUID(), kind, title: title.trim(), detail: detail.trim() || '暂未填写说明', date: '刚刚',
+      id: crypto.randomUUID(), kind, title: title.trim(), detail: detail.trim() || '暂未填写说明', date: '刚刚', createdAt: Date.now(),
       attachmentName: file?.name, hasFile: Boolean(file),
       ingredients: kind === '菜品' ? detail.split(/[，,、\s]+/).filter((item) => ingredients.includes(item)) : undefined,
     };

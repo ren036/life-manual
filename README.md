@@ -17,8 +17,7 @@
 - React
 - TypeScript
 - PWA Service Worker
-- LocalStorage：记录元数据
-- IndexedDB：图片和文件附件
+- IndexedDB：记录、图片和文件附件
 
 ## 项目结构
 
@@ -75,8 +74,7 @@ PWA 需要通过 HTTPS 地址访问后才能稳定安装到手机。部署完成
 
 当前版本采用本地优先设计：
 
-- 文字记录保存在浏览器 LocalStorage。
-- 图片和文件保存在浏览器 IndexedDB。
+- 文字记录、图片和文件统一保存在浏览器 IndexedDB。
 - 不需要注册账号，也不会自动上传个人内容。
 - 清除 Safari 网站数据会同时删除本地记录，请勿将当前版本作为重要文件的唯一备份。
 

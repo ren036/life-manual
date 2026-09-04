@@ -6,20 +6,22 @@ import { FoodPage } from './pages/FoodPage';
 import { HomePage } from './pages/HomePage';
 import { LibraryPage } from './pages/LibraryPage';
 import { SearchPage } from './pages/SearchPage';
-import { openFile, saveFile } from './storage/files';
-import { loadRecords, saveRecords } from './storage/records';
+import { insertRecord, loadRecords, openAttachment } from './storage/database';
 import type { AppTab, LifeRecord, RecordKind } from './types';
 
 const pageTitles: Record<AppTab, string> = { home: '生活手册', search: '搜索', food: '今天做什么', library: '全部记录' };
 
 export default function App() {
   const [tab, setTab] = useState<AppTab>('home');
-  const [records, setRecords] = useState<LifeRecord[]>(loadRecords);
+  const [records, setRecords] = useState<LifeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [initialKind, setInitialKind] = useState<RecordKind>('通用');
   const [toast, setToast] = useState('');
 
-  useEffect(() => saveRecords(records), [records]);
+  useEffect(() => {
+    loadRecords().then(setRecords).finally(() => setLoading(false));
+  }, []);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(() => setToast(''), 1800);
@@ -32,15 +34,15 @@ export default function App() {
   }
 
   async function addRecord(record: LifeRecord, file?: File) {
+    await insertRecord(record, file);
     setRecords((current) => [record, ...current]);
-    if (file) await saveFile(record.id, file);
     setSheetOpen(false);
     setTab('home');
     setToast('记录已保存到这台设备');
   }
 
   async function handleOpen(record: LifeRecord) {
-    if (record.hasFile && await openFile(record.id)) return;
+    if (record.hasFile && await openAttachment(record.id)) return;
     setToast(record.detail);
   }
 
@@ -58,9 +60,10 @@ export default function App() {
         additionalProperties: false,
       },
       annotations: { readOnlyHint: false, untrustedContentHint: false },
-      execute(input: { kind: RecordKind; title: string; detail: string }) {
+      async execute(input: { kind: RecordKind; title: string; detail: string }) {
         if (!input?.title?.trim()) throw new Error('标题不能为空');
-        const record: LifeRecord = { id: crypto.randomUUID(), kind: input.kind, title: input.title.trim(), detail: input.detail.trim() || '暂未填写说明', date: '刚刚' };
+        const record: LifeRecord = { id: crypto.randomUUID(), kind: input.kind, title: input.title.trim(), detail: input.detail.trim() || '暂未填写说明', date: '刚刚', createdAt: Date.now() };
+        await insertRecord(record);
         setRecords((current) => [record, ...current]);
         setTab('home');
         return { id: record.id, status: 'created', title: record.title };
@@ -73,10 +76,11 @@ export default function App() {
       <div className="app-frame">
         <header className="topbar"><div><span>我的生活</span><h1>{pageTitles[tab]}</h1></div><button className="icon-button" aria-label="设置"><Settings /></button></header>
         <div className="content-area">
-          {tab === 'home' && <HomePage records={records} onOpen={handleOpen} onNavigate={setTab} onAdd={startAdd} />}
-          {tab === 'search' && <SearchPage records={records} onOpen={handleOpen} />}
-          {tab === 'food' && <FoodPage records={records} />}
-          {tab === 'library' && <LibraryPage records={records} onOpen={handleOpen} />}
+          {loading && <p className="empty-state">正在读取本机记录…</p>}
+          {!loading && tab === 'home' && <HomePage records={records} onOpen={handleOpen} onNavigate={setTab} onAdd={startAdd} />}
+          {!loading && tab === 'search' && <SearchPage records={records} onOpen={handleOpen} />}
+          {!loading && tab === 'food' && <FoodPage records={records} />}
+          {!loading && tab === 'library' && <LibraryPage records={records} onOpen={handleOpen} />}
         </div>
         <button className="floating-add" onClick={() => startAdd()} aria-label="新建记录"><Plus /></button>
         <BottomNav active={tab} onChange={setTab} />
