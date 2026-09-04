@@ -11,6 +11,7 @@ import type { AppTab, LifeRecord, RecordKind } from './types';
 
 const pageTitles: Record<AppTab, string> = { home: '生活手册', search: '搜索', food: '今天做什么', library: '全部记录' };
 
+
 export default function App() {
   const [tab, setTab] = useState<AppTab>('home');
   const [records, setRecords] = useState<LifeRecord[]>([]);
