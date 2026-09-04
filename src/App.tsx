@@ -2,92 +2,49 @@ import { Plus, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddRecordSheet } from './components/AddRecordSheet';
 import { BottomNav } from './components/BottomNav';
-import { FoodPage } from './pages/FoodPage';
+import { DocumentsPage } from './pages/DocumentsPage';
 import { HomePage } from './pages/HomePage';
-import { LibraryPage } from './pages/LibraryPage';
-import { SearchPage } from './pages/SearchPage';
-import { insertRecord, loadRecords, openAttachment } from './storage/database';
-import type { AppTab, LifeRecord, RecordKind } from './types';
+import { RecipesPage } from './pages/RecipesPage';
+import { TasksPage } from './pages/TasksPage';
+import { insertDocument, insertRecipe, insertTask, loadAppData, openAttachment, updateTask } from './storage/database';
+import type { AddMode, AppTab, DocumentItem, Recipe, TaskItem } from './types';
 
-const pageTitles: Record<AppTab, string> = { home: '生活手册', search: '搜索', food: '今天做什么', library: '全部记录' };
-
+const pageTitles: Record<AppTab, string> = { home: '生活手册', recipes: '我的菜谱', documents: '资料库', tasks: '待办事项' };
+type SavedItem = Recipe | DocumentItem | TaskItem;
 
 export default function App() {
   const [tab, setTab] = useState<AppTab>('home');
-  const [records, setRecords] = useState<LifeRecord[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [initialKind, setInitialKind] = useState<RecordKind>('通用');
+  const [addMode, setAddMode] = useState<AddMode>('tasks');
   const [toast, setToast] = useState('');
 
-  useEffect(() => {
-    loadRecords().then(setRecords).finally(() => setLoading(false));
-  }, []);
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(''), 1800);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  useEffect(() => { loadAppData().then((data) => { setRecipes(data.recipes); setDocuments(data.documents); setTasks(data.tasks); }).finally(() => setLoading(false)); }, []);
+  useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(''), 2200); return () => window.clearTimeout(timer); }, [toast]);
 
-  function startAdd(kind: RecordKind = '通用') {
-    setInitialKind(kind);
-    setSheetOpen(true);
+  function startAdd(mode: AddMode) { setAddMode(mode); setSheetOpen(true); }
+  async function saveItem(item: SavedItem, file?: File) {
+    if (addMode === 'recipes') { await insertRecipe(item as Recipe, file); setRecipes((old) => [item as Recipe, ...old]); }
+    else if (addMode === 'documents') { await insertDocument(item as DocumentItem, file); setDocuments((old) => [item as DocumentItem, ...old]); }
+    else { await insertTask(item as TaskItem); setTasks((old) => [item as TaskItem, ...old]); }
+    setSheetOpen(false); setTab(addMode); setToast('已经保存好了');
   }
-
-  async function addRecord(record: LifeRecord, file?: File) {
-    await insertRecord(record, file);
-    setRecords((current) => [record, ...current]);
-    setSheetOpen(false);
-    setTab('home');
-    setToast('记录已保存到这台设备');
+  async function toggleTask(item: TaskItem) {
+    const updated = { ...item, completed: !item.completed, completedAt: item.completed ? undefined : Date.now() };
+    await updateTask(updated); setTasks((old) => old.map((task) => task.id === item.id ? updated : task));
   }
-
-  async function handleOpen(record: LifeRecord) {
-    if (record.hasFile && await openAttachment(record.id)) return;
-    setToast(record.detail);
-  }
+  async function openRecipe(item: Recipe) { if (item.hasFile && await openAttachment(item.id)) return; setToast(item.notes || item.ingredients.join('、') || '暂无更多说明'); }
+  async function openDocument(item: DocumentItem) { if (item.hasFile && await openAttachment(item.id)) return; setToast(item.description || '这份资料还没有附件'); }
 
   useEffect(() => {
     const context = (document as Document & { modelContext?: { registerTool: (tool: unknown) => void } }).modelContext;
     if (!context?.registerTool) return;
-    context.registerTool({
-      name: 'create_life_record',
-      title: '新建生活记录',
-      description: '在生活手册中创建一条新的文字记录。',
-      inputSchema: {
-        type: 'object',
-        properties: { kind: { type: 'string', enum: ['通用', '菜品', '维修', '图片', '文件'] }, title: { type: 'string' }, detail: { type: 'string' } },
-        required: ['kind', 'title', 'detail'],
-        additionalProperties: false,
-      },
-      annotations: { readOnlyHint: false, untrustedContentHint: false },
-      async execute(input: { kind: RecordKind; title: string; detail: string }) {
-        if (!input?.title?.trim()) throw new Error('标题不能为空');
-        const record: LifeRecord = { id: crypto.randomUUID(), kind: input.kind, title: input.title.trim(), detail: input.detail.trim() || '暂未填写说明', date: '刚刚', createdAt: Date.now() };
-        await insertRecord(record);
-        setRecords((current) => [record, ...current]);
-        setTab('home');
-        return { id: record.id, status: 'created', title: record.title };
-      },
-    });
+    context.registerTool({ name: 'create_task', title: '新建待办', description: '在生活手册中添加一件要做的事。', inputSchema: { type: 'object', properties: { title: { type: 'string' }, notes: { type: 'string' }, category: { type: 'string' } }, required: ['title'], additionalProperties: false }, annotations: { readOnlyHint: false, untrustedContentHint: false }, async execute(input: { title: string; notes?: string; category?: string }) { const item: TaskItem = { id: crypto.randomUUID(), title: input.title.trim(), notes: input.notes?.trim() || '', category: input.category?.trim() || '生活', priority: '普通', completed: false, createdAt: Date.now() }; await insertTask(item); setTasks((old) => [item, ...old]); return { id: item.id, status: 'created', title: item.title }; } });
   }, []);
 
-  return (
-    <main className="shell">
-      <div className="app-frame">
-        <header className="topbar"><div><span>我的生活</span><h1>{pageTitles[tab]}</h1></div><button className="icon-button" aria-label="设置"><Settings /></button></header>
-        <div className="content-area">
-          {loading && <p className="empty-state">正在读取本机记录…</p>}
-          {!loading && tab === 'home' && <HomePage records={records} onOpen={handleOpen} onNavigate={setTab} onAdd={startAdd} />}
-          {!loading && tab === 'search' && <SearchPage records={records} onOpen={handleOpen} />}
-          {!loading && tab === 'food' && <FoodPage records={records} />}
-          {!loading && tab === 'library' && <LibraryPage records={records} onOpen={handleOpen} />}
-        </div>
-        <button className="floating-add" onClick={() => startAdd()} aria-label="新建记录"><Plus /></button>
-        <BottomNav active={tab} onChange={setTab} />
-        {toast && <div className="toast" aria-live="polite">{toast}</div>}
-      </div>
-      <AddRecordSheet open={sheetOpen} initialKind={initialKind} onClose={() => setSheetOpen(false)} onSave={addRecord} />
-    </main>
-  );
+  const floatingMode: AddMode = tab === 'home' ? 'tasks' : tab;
+  return <main className="shell antialiased"><div className="app-frame"><header className="topbar"><div><span>我的生活</span><h1>{pageTitles[tab]}</h1></div><button className="icon-button" aria-label="设置" onClick={() => setToast('设置功能将在下一版加入')}><Settings /></button></header><div className="content-area">{loading && <p className="empty-state">正在整理你的记录…</p>}{!loading && tab === 'home' && <HomePage recipes={recipes} documents={documents} tasks={tasks} onNavigate={setTab} onAdd={startAdd} />}{!loading && tab === 'recipes' && <RecipesPage recipes={recipes} onOpen={openRecipe} />}{!loading && tab === 'documents' && <DocumentsPage documents={documents} onOpen={openDocument} />}{!loading && tab === 'tasks' && <TasksPage tasks={tasks} onToggle={toggleTask} />}</div>{tab !== 'home' && <button className="floating-add" onClick={() => startAdd(floatingMode)} aria-label="新增"><Plus /></button>}<BottomNav active={tab} onChange={setTab} />{toast && <div className="toast" aria-live="polite">{toast}</div>}</div><AddRecordSheet open={sheetOpen} mode={addMode} onClose={() => setSheetOpen(false)} onSave={saveItem} /></main>;
 }

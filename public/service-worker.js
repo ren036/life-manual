@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-manual-v2';
+const CACHE_NAME = 'life-manual-v3';
 const APP_SHELL = ['/', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

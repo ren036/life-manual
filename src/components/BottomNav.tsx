@@ -1,11 +1,11 @@
-import { Home, Library, Search, Utensils } from 'lucide-react';
+import { CheckSquare, Home, Images, Utensils } from 'lucide-react';
 import type { AppTab } from '../types';
 
 const items = [
   { id: 'home', label: '首页', icon: Home },
-  { id: 'search', label: '搜索', icon: Search },
-  { id: 'food', label: '找菜', icon: Utensils },
-  { id: 'library', label: '记录', icon: Library },
+  { id: 'recipes', label: '菜谱', icon: Utensils },
+  { id: 'documents', label: '资料库', icon: Images },
+  { id: 'tasks', label: '待办', icon: CheckSquare },
 ] as const;
 
 export function BottomNav({ active, onChange }: { active: AppTab; onChange: (tab: AppTab) => void }) {

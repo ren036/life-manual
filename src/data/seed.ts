@@ -1,4 +1,4 @@
-import type { LifeRecord } from '../types';
+import type { LifeRecord, TaskItem } from '../types';
 
 export const ingredients = ['鸡蛋', '番茄', '青椒', '土豆', '鸡胸肉', '豆腐'];
 
@@ -8,4 +8,9 @@ export const seedRecords: LifeRecord[] = [
   { id: 'invoice', kind: '文件', title: '冰箱电子发票', detail: '购买于 2025 年 6 月，保修至 2028 年 6 月。', date: '6 月 18 日', createdAt: 3, attachmentName: '冰箱发票.pdf' },
   { id: 'pepper-egg', kind: '菜品', title: '青椒炒蛋', detail: '青椒先干煸一分钟，约 12 分钟。', date: '5 月 12 日', createdAt: 2, ingredients: ['鸡蛋', '青椒'] },
   { id: 'potato-chicken', kind: '菜品', title: '土豆鸡丁', detail: '鸡肉用生抽和淀粉腌 10 分钟。', date: '4 月 27 日', createdAt: 1, ingredients: ['土豆', '鸡胸肉'] },
+];
+
+export const seedTasks: TaskItem[] = [
+  { id: 'task-backup', title: '备份重要资料', notes: '整理证件和发票的电子版', category: '家庭', priority: '重要', completed: false, createdAt: 7 },
+  { id: 'task-shopping', title: '补充鸡蛋和番茄', notes: '', category: '采购', priority: '普通', completed: false, createdAt: 6 },
 ];
