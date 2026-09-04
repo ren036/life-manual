@@ -1,0 +1,10 @@
+{
+  "name": "生活手册",
+  "short_name": "生活手册",
+  "description": "个人生活记录与经验检索",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f3f3ec",
+  "theme_color": "#477450"
+}
