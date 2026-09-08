@@ -1,6 +1,5 @@
 import {
   ActionIcon,
-  Affix,
   Box,
   Button,
   Group,
@@ -12,7 +11,7 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { ArrowLeft, Pencil, Plus, Settings, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Settings, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { AddRecordSheet } from './components/AddRecordSheet';
 import { BottomNav } from './components/BottomNav';
@@ -500,29 +499,11 @@ export default function App() {
             />
           )}
         </Box>
-        {!route.id && tab !== 'home' && (
-          <Affix
-            position={{
-              bottom: 86,
-              left: 'max(0px, calc(50% - 240px))',
-              right: 'max(0px, calc(50% - 240px))',
-            }}
-            zIndex={8}
-          >
-            <Group justify="flex-end" px="md">
-              <ActionIcon
-                size={52}
-                color="green"
-                variant="filled"
-                onClick={() => startAdd(floatingMode)}
-                aria-label="新增"
-              >
-                <Plus size={24} />
-              </ActionIcon>
-            </Group>
-          </Affix>
-        )}
-        <BottomNav active={tab} onChange={setTab} />
+        <BottomNav
+          active={tab}
+          onChange={setTab}
+          onAdd={!route.id && tab !== 'home' ? () => startAdd(floatingMode) : undefined}
+        />
         <AddRecordSheet
           initialItem={editingItem}
           open={sheetOpen}
