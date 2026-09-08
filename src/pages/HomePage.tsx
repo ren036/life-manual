@@ -1,7 +1,9 @@
 import {
   Badge,
   Button,
+  CloseButton,
   Group,
+  Input,
   Paper,
   SimpleGrid,
   Stack,
@@ -205,6 +207,14 @@ export function HomePage({
         onChange={(event) => setQuery(event.currentTarget.value)}
         placeholder="搜索菜谱、资料或待办"
         size="lg"
+        rightSection={
+          query ? (
+            <Input.ClearButton
+              aria-label="Clear input"
+              onClick={() => setQuery('')}
+            />
+          ) : null
+        }
       />
       {results ? (
         <Stack gap="xs">

@@ -3,6 +3,7 @@ import {
   Button,
   Center,
   Group,
+  Input,
   Paper,
   Select,
   Stack,
@@ -82,6 +83,14 @@ export function DocumentsPage({
           onChange={(e) => setQuery(e.currentTarget.value)}
           placeholder="搜索资料或标签"
           radius="md"
+          rightSection={
+                    query ? (
+                      <Input.ClearButton
+                        aria-label="Clear input"
+                        onClick={() => setQuery('')}
+                      />
+                    ) : null
+                  }
         />
         <Select
           w={110}

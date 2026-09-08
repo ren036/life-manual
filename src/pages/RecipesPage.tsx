@@ -6,6 +6,7 @@ import {
   Center,
   Drawer,
   Group,
+  Input,
   Paper,
   Select,
   SimpleGrid,
@@ -72,9 +73,9 @@ export function RecipesPage({
           (item) =>
             (filter === 'all' || filter.startsWith('special:')
               ? filter === 'all' ||
-                (filter === 'special:favorite' && !!item.favorite) ||
-                (filter === 'special:cooked' && !!item.cookingRecords?.length) ||
-                (filter === 'special:uncooked' && !item.cookingRecords?.length)
+              (filter === 'special:favorite' && !!item.favorite) ||
+              (filter === 'special:cooked' && !!item.cookingRecords?.length) ||
+              (filter === 'special:uncooked' && !item.cookingRecords?.length)
               : filter.startsWith('tag:')
                 ? item.tags?.includes(filter.slice(4))
                 : item.category === filter.slice(9)) &&
@@ -128,6 +129,14 @@ export function RecipesPage({
           onChange={(e) => setQuery(e.currentTarget.value)}
           placeholder="搜菜名、食材或标签"
           radius="md"
+          rightSection={
+            query ? (
+              <Input.ClearButton
+                aria-label="Clear input"
+                onClick={() => setQuery('')}
+              />
+            ) : null
+          }
         />
         <Select
           w={110}
