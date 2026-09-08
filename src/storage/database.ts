@@ -6,6 +6,7 @@ import type {
   AddMode,
   Attachment,
   DocumentItem,
+  NoteEntry,
   PendingAttachment,
   Recipe,
   TaskItem,
@@ -13,14 +14,15 @@ import type {
 } from '../types';
 
 const DATABASE_NAME = 'life-manual';
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 const RECORDS_STORE = 'records';
 const ATTACHMENTS_STORE = 'attachments';
 const RECIPES_STORE = 'recipes';
 const DOCUMENTS_STORE = 'documents';
 const TASKS_STORE = 'tasks';
+const NOTES_STORE = 'notes';
 const SETTINGS_STORE = 'settings';
-const CURRENT_BACKUP_VERSION = 3;
+const CURRENT_BACKUP_VERSION = 4;
 const PRE_IMPORT_BACKUP_KEY = 'pre-import-backup';
 
 export type ImportMode = 'merge' | 'replace';
@@ -33,11 +35,12 @@ export interface BackupFile {
 }
 
 export interface LifeManualBackup {
-  version: 3;
+  version: 4;
   exportedAt: string;
   recipes: Recipe[];
   documents: DocumentItem[];
   tasks: TaskItem[];
+  notes: NoteEntry[];
   attachments: BackupFile[];
 }
 
@@ -70,6 +73,8 @@ function openDatabase(): Promise<IDBDatabase> {
         database.createObjectStore(DOCUMENTS_STORE, { keyPath: 'id' });
       if (!database.objectStoreNames.contains(TASKS_STORE))
         database.createObjectStore(TASKS_STORE, { keyPath: 'id' });
+      if (!database.objectStoreNames.contains(NOTES_STORE))
+        database.createObjectStore(NOTES_STORE, { keyPath: 'id' });
       if (!database.objectStoreNames.contains(SETTINGS_STORE))
         database.createObjectStore(SETTINGS_STORE);
       if ((event as IDBVersionChangeEvent).oldVersion > 0)
@@ -122,7 +127,7 @@ function toDocument(record: LegacyRecord): DocumentItem {
 export async function loadAppData(includeSeedData = true): Promise<AppData> {
   const database = await openDatabase();
   await purgeExpiredTrash(database);
-  let [recipes, documents, tasks, initialized] = await Promise.all([
+  let [recipes, documents, tasks, notes, initialized] = await Promise.all([
     requestResult(
       database.transaction(RECIPES_STORE).objectStore(RECIPES_STORE).getAll(),
     ) as Promise<Recipe[]>,
@@ -131,6 +136,9 @@ export async function loadAppData(includeSeedData = true): Promise<AppData> {
     ) as Promise<DocumentItem[]>,
     requestResult(database.transaction(TASKS_STORE).objectStore(TASKS_STORE).getAll()) as Promise<
       TaskItem[]
+    >,
+    requestResult(database.transaction(NOTES_STORE).objectStore(NOTES_STORE).getAll()) as Promise<
+      NoteEntry[]
     >,
     requestResult(
       database.transaction(SETTINGS_STORE).objectStore(SETTINGS_STORE).get('initialized'),
@@ -172,12 +180,13 @@ export async function loadAppData(includeSeedData = true): Promise<AppData> {
     recipes: newest(recipes.filter((item) => item.deletedAt === undefined)),
     documents: newest(documents.filter((item) => item.deletedAt === undefined)),
     tasks: newest(tasks.filter((item) => item.deletedAt === undefined)),
+    notes: newest(notes.filter((item) => item.deletedAt === undefined)),
   };
 }
 
 async function putItem(
   store: string,
-  item: Recipe | DocumentItem | TaskItem,
+  item: Recipe | DocumentItem | TaskItem | NoteEntry,
   files: PendingAttachment[] = [],
   removedIds: string[] = [],
 ): Promise<void> {
@@ -206,6 +215,14 @@ export async function updateRecord(
 
 export const insertTask = (item: TaskItem) => putItem(TASKS_STORE, item);
 export const updateTask = (item: TaskItem) => putItem(TASKS_STORE, item);
+export const insertNote = (item: NoteEntry, audio?: PendingAttachment) =>
+  putItem(NOTES_STORE, item, audio ? [audio] : []);
+export const updateNote = (item: NoteEntry, previous: NoteEntry, audio?: PendingAttachment) => {
+  const removed = previous.audio && previous.audio.id !== item.audio?.id ? [previous.audio.id] : [];
+  return putItem(NOTES_STORE, item, audio ? [audio] : [], removed);
+};
+export const deleteNote = (item: NoteEntry) =>
+  putItem(NOTES_STORE, { ...item, deletedAt: Date.now() });
 
 export async function bulkUpdateItems(
   mode: AddMode,
@@ -259,7 +276,7 @@ export async function deleteTask(item: TaskItem): Promise<void> {
 }
 
 async function readTrash(database: IDBDatabase): Promise<TrashEntry[]> {
-  const [recipes, documents, tasks] = await Promise.all([
+  const [recipes, documents, tasks, notes] = await Promise.all([
     requestResult(
       database.transaction(RECIPES_STORE).objectStore(RECIPES_STORE).getAll(),
     ) as Promise<Recipe[]>,
@@ -268,6 +285,9 @@ async function readTrash(database: IDBDatabase): Promise<TrashEntry[]> {
     ) as Promise<DocumentItem[]>,
     requestResult(database.transaction(TASKS_STORE).objectStore(TASKS_STORE).getAll()) as Promise<
       TaskItem[]
+    >,
+    requestResult(database.transaction(NOTES_STORE).objectStore(NOTES_STORE).getAll()) as Promise<
+      NoteEntry[]
     >,
   ]);
   return [
@@ -284,6 +304,11 @@ async function readTrash(database: IDBDatabase): Promise<TrashEntry[]> {
         (item): item is TaskItem & { deletedAt: number } => typeof item.deletedAt === 'number',
       )
       .map((item) => ({ kind: 'task' as const, item })),
+    ...notes
+      .filter(
+        (item): item is NoteEntry & { deletedAt: number } => typeof item.deletedAt === 'number',
+      )
+      .map((item) => ({ kind: 'note' as const, item })),
   ].sort((a, b) => b.item.deletedAt - a.item.deletedAt);
 }
 
@@ -306,7 +331,7 @@ async function permanentlyDeleteEntries(
     entries.filter((entry) => entry.kind === 'task').map((entry) => entry.item.id),
   );
   const transaction = database.transaction(
-    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, ATTACHMENTS_STORE],
+    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, NOTES_STORE, ATTACHMENTS_STORE],
     'readwrite',
   );
   const attachments = transaction.objectStore(ATTACHMENTS_STORE);
@@ -325,9 +350,15 @@ async function permanentlyDeleteEntries(
         ? RECIPES_STORE
         : entry.kind === 'document'
           ? DOCUMENTS_STORE
-          : TASKS_STORE;
+          : entry.kind === 'task'
+            ? TASKS_STORE
+            : NOTES_STORE;
     transaction.objectStore(store).delete(entry.item.id);
-    if (entry.kind !== 'task') attachmentIds(entry.item).forEach((id) => attachments.delete(id));
+    if (entry.kind === 'note') {
+      if (entry.item.audio) attachments.delete(entry.item.audio.id);
+    } else if (entry.kind !== 'task') {
+      attachmentIds(entry.item).forEach((id) => attachments.delete(id));
+    }
   });
   await complete(transaction);
 }
@@ -352,8 +383,10 @@ export async function restoreTrashEntry(entry: TrashEntry): Promise<void> {
       ? RECIPES_STORE
       : entry.kind === 'document'
         ? DOCUMENTS_STORE
-        : TASKS_STORE;
-  await putItem(store, restored as Recipe | DocumentItem | TaskItem);
+        : entry.kind === 'task'
+          ? TASKS_STORE
+          : NOTES_STORE;
+  await putItem(store, restored as Recipe | DocumentItem | TaskItem | NoteEntry);
 }
 
 export async function permanentlyDeleteTrashEntry(entry: TrashEntry): Promise<void> {
@@ -542,6 +575,22 @@ function isTask(value: unknown): value is TaskItem {
   );
 }
 
+function isNote(value: unknown): value is NoteEntry {
+  return (
+    isObject(value) &&
+    typeof value.id === 'string' &&
+    !!value.id &&
+    typeof value.title === 'string' &&
+    typeof value.content === 'string' &&
+    ['开心', '平静', '低落', '焦虑', '生气'].includes(String(value.mood)) &&
+    (value.audio === undefined || isAttachment(value.audio)) &&
+    typeof value.createdAt === 'number' &&
+    Number.isFinite(value.createdAt) &&
+    isOptionalFiniteNumber(value.updatedAt) &&
+    isOptionalFiniteNumber(value.deletedAt)
+  );
+}
+
 function isBackupFile(value: unknown): value is BackupFile {
   return (
     isObject(value) &&
@@ -560,7 +609,7 @@ function hasUniqueIds(items: Array<{ id: string }>): boolean {
 
 export function parseBackup(value: unknown): LifeManualBackup {
   if (!isObject(value)) throw new Error('备份内容不是有效对象');
-  if (value.version !== 1 && value.version !== 2 && value.version !== CURRENT_BACKUP_VERSION)
+  if (![1, 2, 3, CURRENT_BACKUP_VERSION].includes(Number(value.version)))
     throw new Error(`不支持的备份版本：${String(value.version)}`);
   if (typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)))
     throw new Error('备份导出时间无效');
@@ -570,12 +619,15 @@ export function parseBackup(value: unknown): LifeManualBackup {
     throw new Error('资料数据结构不完整');
   if (!Array.isArray(value.tasks) || !value.tasks.every(isTask))
     throw new Error('待办数据结构不完整');
+  const notes = value.notes === undefined ? [] : value.notes;
+  if (!Array.isArray(notes) || !notes.every(isNote)) throw new Error('随记数据结构不完整');
   if (!Array.isArray(value.attachments) || !value.attachments.every(isBackupFile))
     throw new Error('附件数据结构或编码无效');
   if (
     !hasUniqueIds(value.recipes) ||
     !hasUniqueIds(value.documents) ||
     !hasUniqueIds(value.tasks) ||
+    !hasUniqueIds(notes) ||
     !hasUniqueIds(value.attachments)
   )
     throw new Error('备份中存在重复的数据 ID');
@@ -585,27 +637,32 @@ export function parseBackup(value: unknown): LifeManualBackup {
     recipes: value.recipes,
     documents: value.documents,
     tasks: value.tasks,
+    notes,
     attachments: value.attachments,
   };
 }
 
-function attachmentNames(items: Array<Recipe | DocumentItem>): Map<string, string> {
+function attachmentNames(
+  items: Array<Recipe | DocumentItem>,
+  notes: NoteEntry[],
+): Map<string, string> {
   return new Map(
-    items
-      .flatMap((item) => [
+    [
+      ...items.flatMap((item) => [
         ...recordAttachments(item),
         ...(item.steps || []).flatMap((step) => step.attachments),
         ...('ingredients' in item
           ? (item.cookingRecords || []).flatMap((record) => record.attachments)
           : []),
-      ])
-      .map((attachment) => [attachment.id, attachment.name]),
+      ]),
+      ...notes.flatMap((note) => (note.audio ? [note.audio] : [])),
+    ].map((attachment) => [attachment.id, attachment.name]),
   );
 }
 
 export async function exportBackup(): Promise<LifeManualBackup> {
   const database = await openDatabase();
-  const [recipes, documents, tasks, keys, files] = await Promise.all([
+  const [recipes, documents, tasks, notes, keys, files] = await Promise.all([
     requestResult(
       database.transaction(RECIPES_STORE).objectStore(RECIPES_STORE).getAll(),
     ) as Promise<Recipe[]>,
@@ -615,6 +672,9 @@ export async function exportBackup(): Promise<LifeManualBackup> {
     requestResult(database.transaction(TASKS_STORE).objectStore(TASKS_STORE).getAll()) as Promise<
       TaskItem[]
     >,
+    requestResult(database.transaction(NOTES_STORE).objectStore(NOTES_STORE).getAll()) as Promise<
+      NoteEntry[]
+    >,
     requestResult(
       database.transaction(ATTACHMENTS_STORE).objectStore(ATTACHMENTS_STORE).getAllKeys(),
     ) as Promise<IDBValidKey[]>,
@@ -622,7 +682,7 @@ export async function exportBackup(): Promise<LifeManualBackup> {
       database.transaction(ATTACHMENTS_STORE).objectStore(ATTACHMENTS_STORE).getAll(),
     ) as Promise<Blob[]>,
   ]);
-  const names = attachmentNames([...recipes, ...documents]);
+  const names = attachmentNames([...recipes, ...documents], notes);
   const attachments = await Promise.all(
     files.map(async (file, index) => {
       const id = String(keys[index]);
@@ -640,6 +700,7 @@ export async function exportBackup(): Promise<LifeManualBackup> {
     recipes,
     documents,
     tasks,
+    notes,
     attachments,
   };
 }
@@ -654,16 +715,17 @@ async function writeBackup(
     value: base64ToFile(file.data, file.name || '附件', file.type),
   }));
   const transaction = database.transaction(
-    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, ATTACHMENTS_STORE],
+    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, NOTES_STORE, ATTACHMENTS_STORE],
     'readwrite',
   );
   if (mode === 'replace')
-    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, ATTACHMENTS_STORE].forEach((store) =>
+    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, NOTES_STORE, ATTACHMENTS_STORE].forEach((store) =>
       transaction.objectStore(store).clear(),
     );
   backup.recipes.forEach((item) => transaction.objectStore(RECIPES_STORE).put(item));
   backup.documents.forEach((item) => transaction.objectStore(DOCUMENTS_STORE).put(item));
   backup.tasks.forEach((item) => transaction.objectStore(TASKS_STORE).put(item));
+  backup.notes.forEach((item) => transaction.objectStore(NOTES_STORE).put(item));
   files.forEach((file) => transaction.objectStore(ATTACHMENTS_STORE).put(file.value, file.id));
   await complete(transaction);
 }
@@ -676,6 +738,7 @@ async function containsImportedData(
     [RECIPES_STORE, backup.recipes],
     [DOCUMENTS_STORE, backup.documents],
     [TASKS_STORE, backup.tasks],
+    [NOTES_STORE, backup.notes],
     [ATTACHMENTS_STORE, backup.attachments],
   ];
   const results = await Promise.all(

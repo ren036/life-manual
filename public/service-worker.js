@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-manual-v8';
+const CACHE_NAME = 'life-manual-v9';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
 const DATABASE_NAME = 'life-manual';
 

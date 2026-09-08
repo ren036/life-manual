@@ -1,4 +1,4 @@
-export type AppTab = 'home' | 'recipes' | 'documents' | 'tasks';
+export type AppTab = 'home' | 'notes' | 'recipes' | 'documents' | 'tasks';
 export type AddMode = 'recipes' | 'documents' | 'tasks';
 
 export interface Attachment {
@@ -99,13 +99,28 @@ export interface TaskItem {
   deletedAt?: number;
 }
 
+export type Mood = '开心' | '平静' | '低落' | '焦虑' | '生气';
+
+export interface NoteEntry {
+  id: string;
+  title: string;
+  content: string;
+  mood: Mood;
+  audio?: Attachment;
+  createdAt: number;
+  updatedAt?: number;
+  deletedAt?: number;
+}
+
 export type TrashEntry =
   | { kind: 'recipe'; item: Recipe & { deletedAt: number } }
   | { kind: 'document'; item: DocumentItem & { deletedAt: number } }
-  | { kind: 'task'; item: TaskItem & { deletedAt: number } };
+  | { kind: 'task'; item: TaskItem & { deletedAt: number } }
+  | { kind: 'note'; item: NoteEntry & { deletedAt: number } };
 
 export interface AppData {
   recipes: Recipe[];
   documents: DocumentItem[];
   tasks: TaskItem[];
+  notes: NoteEntry[];
 }

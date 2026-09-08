@@ -18,12 +18,14 @@ import { AddRecordSheet } from './components/AddRecordSheet';
 import { BottomNav } from './components/BottomNav';
 import { CookingRecordSheet } from './components/CookingRecordSheet';
 import { OrganizeSheet } from './components/OrganizeSheet';
+import { NoteSheet } from './components/NoteSheet';
 import { SettingsSheet } from './components/SettingsSheet';
 import { TrashSheet } from './components/TrashSheet';
 import { WelcomeGuide } from './components/WelcomeGuide';
 import { isBackupOverdue } from './dataSafety';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { HomePage } from './pages/HomePage';
+import { NotesPage } from './pages/NotesPage';
 import { RecipesPage } from './pages/RecipesPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { TasksPage } from './pages/TasksPage';
@@ -33,12 +35,14 @@ import {
   advanceTask,
   bulkUpdateItems,
   deleteRecord,
+  deleteNote,
   deleteTask,
   emptyTrash,
   exportBackup,
   getAttachmentFiles,
   importBackup,
   insertDocument,
+  insertNote,
   insertRecipe,
   insertTask,
   loadAppData,
@@ -49,6 +53,7 @@ import {
   restoreTrashEntry,
   setReminderEnabled,
   updateRecord,
+  updateNote,
   updateTask,
 } from './storage/database';
 import type { ImportMode } from './storage/database';
@@ -57,6 +62,7 @@ import type {
   AppTab,
   CookingRecord,
   DocumentItem,
+  NoteEntry,
   PendingAttachment,
   Recipe,
   RelatedRecordRef,
@@ -66,6 +72,7 @@ import type {
 
 const pageTitles: Record<AppTab, string> = {
   home: '生活手册',
+  notes: '随记与心情',
   recipes: '我的菜谱',
   documents: '资料库',
   tasks: '待办事项',
@@ -102,7 +109,7 @@ async function configurePeriodicReminders(enabled: boolean) {
 function readRoute(): { tab: AppTab; id?: string } {
   const [tab, id] = window.location.hash.slice(1).split('/');
   return {
-    tab: ['recipes', 'documents', 'tasks'].includes(tab) ? (tab as AppTab) : 'home',
+    tab: ['notes', 'recipes', 'documents', 'tasks'].includes(tab) ? (tab as AppTab) : 'home',
     id: tab === 'recipes' || tab === 'documents' ? id : undefined,
   };
 }
@@ -116,6 +123,9 @@ export default function App() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [notes, setNotes] = useState<NoteEntry[]>([]);
+  const [noteSheetOpen, setNoteSheetOpen] = useState(false);
+  const [editingNote, setEditingNote] = useState<NoteEntry>();
   const [trashItems, setTrashItems] = useState<TrashEntry[]>([]);
   const [trashOpen, setTrashOpen] = useState(false);
   const [organizeOpen, setOrganizeOpen] = useState(false);
@@ -169,6 +179,7 @@ export default function App() {
     setRecipes(data.recipes);
     setDocuments(data.documents);
     setTasks(data.tasks);
+    setNotes(data.notes);
     setTrashItems(trash);
   };
   useEffect(() => {
@@ -287,6 +298,35 @@ export default function App() {
     setTab(addMode);
     setDefaultRelatedRecord(undefined);
     setToast('已经保存好了');
+  }
+  async function saveNote(note: NoteEntry, audio?: PendingAttachment) {
+    if (editingNote) {
+      await updateNote(note, editingNote, audio);
+      setNotes((current) => current.map((item) => (item.id === note.id ? note : item)));
+      setToast('随记已更新');
+    } else {
+      await insertNote(note, audio);
+      setNotes((current) => [note, ...current]);
+      setToast('这一刻已经记下了');
+    }
+    setEditingNote(undefined);
+    setNoteSheetOpen(false);
+  }
+
+  function startNote(note?: NoteEntry) {
+    setEditingNote(note);
+    setNoteSheetOpen(true);
+  }
+
+  async function removeNote(item: NoteEntry) {
+    try {
+      await deleteNote(item);
+      setNotes((current) => current.filter((note) => note.id !== item.id));
+      setTrashItems(await loadTrash());
+      setToast(`已删除随记“${item.title}”`);
+    } catch {
+      setErrorToast('删除失败，请重试');
+    }
   }
   async function toggleTask(item: TaskItem) {
     const updated = {
@@ -650,8 +690,8 @@ export default function App() {
           <Stack gap="md">
             <Text size="sm">
               已验证：{backup.recipes.length} 道菜谱、{backup.documents.length} 份资料、
-              {backup.tasks.length} 个待办、{backup.attachments.length}{' '}
-              个附件。导入前会自动创建临时快照，失败时自动回滚。
+              {backup.tasks.length} 个待办、{backup.notes.length} 条随记、
+              {backup.attachments.length} 个附件。导入前会自动创建临时快照，失败时自动回滚。
             </Text>
             <Radio.Group
               defaultValue="merge"
@@ -700,9 +740,10 @@ export default function App() {
   const detailItem = route.id
     ? (tab === 'recipes' ? recipes : documents).find((item) => item.id === route.id)
     : undefined;
-  const floatingMode: AddMode = tab === 'home' ? 'tasks' : tab;
+  const floatingMode: AddMode =
+    tab === 'recipes' || tab === 'documents' || tab === 'tasks' ? tab : 'tasks';
   const backupOverdue =
-    recipes.length + documents.length + tasks.length > 0 &&
+    recipes.length + documents.length + tasks.length + notes.length > 0 &&
     isBackupOverdue(lastBackupAt || backupBaseline);
   const relatedRecordLabels: Record<string, string> = Object.fromEntries([
     ...recipes.map((item) => [
@@ -871,6 +912,14 @@ export default function App() {
               }}
             />
           )}
+          {!loading && !route.id && tab === 'notes' && (
+            <NotesPage
+              notes={notes}
+              onAdd={() => startNote()}
+              onEdit={startNote}
+              onDelete={(item) => void removeNote(item)}
+            />
+          )}
           {!loading && !route.id && tab === 'documents' && (
             <DocumentsPage
               documents={documents}
@@ -898,7 +947,22 @@ export default function App() {
         <BottomNav
           active={tab}
           onChange={setTab}
-          onAdd={!route.id && tab !== 'home' ? () => startAdd(floatingMode) : undefined}
+          onAdd={
+            !route.id && tab !== 'home'
+              ? tab === 'notes'
+                ? () => startNote()
+                : () => startAdd(floatingMode)
+              : undefined
+          }
+        />
+        <NoteSheet
+          open={noteSheetOpen}
+          initialNote={editingNote}
+          onClose={() => {
+            setNoteSheetOpen(false);
+            setEditingNote(undefined);
+          }}
+          onSave={saveNote}
         />
         <AddRecordSheet
           initialItem={editingItem}
@@ -938,7 +1002,7 @@ export default function App() {
         />
         <OrganizeSheet
           open={organizeOpen}
-          data={{ recipes, documents, tasks }}
+          data={{ recipes, documents, tasks, notes }}
           onClose={() => setOrganizeOpen(false)}
           onApply={organizeItems}
         />

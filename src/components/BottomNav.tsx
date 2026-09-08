@@ -8,11 +8,12 @@ import {
   ThemeIcon,
   UnstyledButton,
 } from '@mantine/core';
-import { CheckSquare, Home, Images, Plus, Utensils } from 'lucide-react';
+import { BookHeart, CheckSquare, Home, Images, Plus, Utensils } from 'lucide-react';
 import type { AppTab } from '../types';
 
 const items = [
   { id: 'home', label: '首页', icon: Home },
+  { id: 'notes', label: '随记', icon: BookHeart },
   { id: 'recipes', label: '菜谱', icon: Utensils },
   { id: 'documents', label: '资料库', icon: Images },
   { id: 'tasks', label: '待办', icon: CheckSquare },
@@ -58,7 +59,7 @@ export function BottomNav({
             <Plus size={24} />
           </ActionIcon>
         )}
-        <SimpleGrid cols={4} spacing={0}>
+        <SimpleGrid cols={5} spacing={0}>
           {items.map(({ id, label, icon: Icon }) => (
             <UnstyledButton
               key={id}

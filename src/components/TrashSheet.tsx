@@ -1,9 +1,9 @@
 import { ActionIcon, Button, Drawer, Group, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
-import { CheckSquare, FileText, RotateCcw, Trash2, Utensils } from 'lucide-react';
+import { BookHeart, CheckSquare, FileText, RotateCcw, Trash2, Utensils } from 'lucide-react';
 import { trashDaysRemaining } from '../dataSafety';
 import type { TrashEntry } from '../types';
 
-const kindLabel = { recipe: '菜谱', document: '资料', task: '待办' } as const;
+const kindLabel = { recipe: '菜谱', document: '资料', task: '待办', note: '随记' } as const;
 
 export function TrashSheet({
   open,
@@ -49,6 +49,8 @@ export function TrashSheet({
                   <Utensils size={18} />
                 ) : entry.kind === 'document' ? (
                   <FileText size={18} />
+                ) : entry.kind === 'note' ? (
+                  <BookHeart size={18} />
                 ) : (
                   <CheckSquare size={18} />
                 )}
