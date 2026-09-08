@@ -44,6 +44,8 @@ export function RecipesPage({
   const categories = [
     { value: 'all', label: '全部' },
     { value: 'special:favorite', label: '收藏' },
+    { value: 'special:cooked', label: '做过' },
+    { value: 'special:uncooked', label: '没做过' },
     ...[...new Set(recipes.map((item) => item.category))].map((category) => ({
       value: `category:${category}`,
       label: category,
@@ -58,8 +60,11 @@ export function RecipesPage({
       recipes
         .filter(
           (item) =>
-            (filter === 'all' || filter === 'special:favorite'
-              ? filter === 'all' || !!item.favorite
+            (filter === 'all' || filter.startsWith('special:')
+              ? filter === 'all' ||
+                (filter === 'special:favorite' && !!item.favorite) ||
+                (filter === 'special:cooked' && !!item.cookingRecords?.length) ||
+                (filter === 'special:uncooked' && !item.cookingRecords?.length)
               : filter.startsWith('tag:')
                 ? item.tags?.includes(filter.slice(4))
                 : item.category === filter.slice(9)) &&
