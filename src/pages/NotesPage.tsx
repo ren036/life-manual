@@ -14,7 +14,7 @@ import { getAttachmentUrl } from '../storage/database';
 import type { Mood, NoteEntry } from '../types';
 
 const moodEmoji: Record<Mood, string> = {
-  开心: '😊',
+  开心: '😄',
   平静: '😌',
   低落: '😔',
   焦虑: '😟',

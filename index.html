@@ -12,10 +12,59 @@
     <meta name="apple-mobile-web-app-title" content="生活手册" />
     <meta name="description" content="记录做过的菜、重要资料和日常待办的个人生活手册" />
     <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
     <title>生活手册</title>
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        margin: 0;
+      }
+
+      html,
+      body {
+        background: #f8f9fa;
+      }
+
+      .app-boot {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: grid;
+        place-content: center;
+        justify-items: center;
+        gap: 14px;
+        color: #285d45;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      .app-boot__mark {
+        display: grid;
+        width: 58px;
+        height: 58px;
+        place-items: center;
+        border-radius: 18px;
+        background: #2f6b4f;
+        color: white;
+        font-size: 29px;
+        font-weight: 800;
+        box-shadow: 0 10px 28px rgb(47 107 79 / 18%);
+      }
+
+      .app-boot__title {
+        font-size: 17px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-boot" role="status" aria-label="生活手册正在启动">
+        <div class="app-boot__mark" aria-hidden="true">生</div>
+        <div class="app-boot__title">生活手册</div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

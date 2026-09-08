@@ -31,7 +31,7 @@ interface SpeechRecognitionLike {
 }
 type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 
-const moodData = ['😊 开心', '😌 平静', '😔 低落', '😟 焦虑', '😤 生气'];
+const moodData = ['😄 开心', '😌 平静', '😔 低落', '😟 焦虑', '😤 生气'];
 const moodFromLabel = (value: string) => value.slice(3) as Mood;
 
 export function NoteSheet({

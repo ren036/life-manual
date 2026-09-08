@@ -1,4 +1,4 @@
-const CACHE_NAME = 'life-manual-v9';
+const CACHE_NAME = 'life-manual-v10';
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
 const DATABASE_NAME = 'life-manual';
 
@@ -92,6 +92,7 @@ async function cacheAppShell() {
 
 self.addEventListener('install', (event) => {
   event.waitUntil(cacheAppShell());
+  self.skipWaiting();
 });
 
 self.addEventListener('periodicsync', (event) => {
@@ -125,22 +126,37 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
-  event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+
+  const fetchAndCache = async () => {
+    const response = await fetch(event.request);
+    if (response.status === 200) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(event.request, response.clone());
+    }
+    return response;
+  };
+
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      caches.match(event.request).then(async (cached) => {
+        if (cached) {
+          event.waitUntil(fetchAndCache().catch(() => undefined));
+          return cached;
         }
-        return response;
-      })
-      .catch(() =>
-        caches
-          .match(event.request)
-          .then(
-            (cached) =>
-              cached || (event.request.mode === 'navigate' ? caches.match('/') : undefined),
-          ),
-      ),
+        try {
+          return await fetchAndCache();
+        } catch {
+          return caches.match('/');
+        }
+      }),
+    );
+    return;
+  }
+
+  event.respondWith(
+    caches.match(event.request).then(async (cached) => {
+      if (cached) return cached;
+      return fetchAndCache();
+    }),
   );
 });
