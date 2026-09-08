@@ -38,25 +38,31 @@ export function RecipesPage({
   onOpen: (item: Recipe) => void;
   onAdd: () => void;
 }) {
-  const [filter, setFilter] = useState('全部');
+  const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortMode>('最近添加');
   const categories = [
-    '全部',
-    '收藏',
-    ...new Set(recipes.map((item) => item.category)),
-    ...new Set(recipes.flatMap((item) => item.tags || []).map((tag) => `#${tag}`)),
+    { value: 'all', label: '全部' },
+    { value: 'special:favorite', label: '收藏' },
+    ...[...new Set(recipes.map((item) => item.category))].map((category) => ({
+      value: `category:${category}`,
+      label: category,
+    })),
+    ...[...new Set(recipes.flatMap((item) => item.tags || []))].map((tag) => ({
+      value: `tag:${tag}`,
+      label: `#${tag}`,
+    })),
   ];
   const shown = useMemo(
     () =>
       recipes
         .filter(
           (item) =>
-            (filter === '全部' || filter === '收藏'
-              ? filter === '全部' || !!item.favorite
-              : filter.startsWith('#')
-                ? item.tags?.includes(filter.slice(1))
-                : item.category === filter) &&
+            (filter === 'all' || filter === 'special:favorite'
+              ? filter === 'all' || !!item.favorite
+              : filter.startsWith('tag:')
+                ? item.tags?.includes(filter.slice(4))
+                : item.category === filter.slice(9)) &&
             `${item.title} ${item.notes} ${item.ingredients.join(' ')} ${(item.tags || []).join(' ')}`
               .toLowerCase()
               .includes(query.toLowerCase()),
@@ -90,13 +96,13 @@ export function RecipesPage({
       <Group gap="xs" wrap="wrap">
         {categories.map((item) => (
           <Button
-            key={item}
+            key={item.value}
             size="compact-sm"
             radius="xl"
-            variant={filter === item ? 'filled' : 'light'}
-            onClick={() => setFilter(item)}
+            variant={filter === item.value ? 'filled' : 'light'}
+            onClick={() => setFilter(item.value)}
           >
-            {item}
+            {item.label}
           </Button>
         ))}
       </Group>

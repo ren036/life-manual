@@ -38,6 +38,7 @@ export function TasksPage({
   onAdd,
   relatedRecordLabels,
   onOpenRelated,
+  busyTaskIds,
 }: {
   tasks: TaskItem[];
   onToggle: (item: TaskItem) => void;
@@ -47,6 +48,7 @@ export function TasksPage({
   onAdd: () => void;
   relatedRecordLabels: Record<string, string>;
   onOpenRelated: (reference: RelatedRecordRef) => void;
+  busyTaskIds: Set<string>;
 }) {
   const [view, setView] = useState<'进行中' | '已完成'>('进行中');
   const [filter, setFilter] = useState<'全部' | '今天' | '逾期' | '紧急'>('全部');
@@ -118,6 +120,8 @@ export function TasksPage({
                 variant={item.completed ? 'filled' : 'light'}
                 color="green"
                 size={38}
+                loading={busyTaskIds.has(item.id)}
+                disabled={busyTaskIds.has(item.id)}
                 onClick={() => onToggle(item)}
                 aria-label={item.completed ? '恢复待办' : '完成待办'}
               >
@@ -174,6 +178,7 @@ export function TasksPage({
                       <ActionIcon
                         variant="subtle"
                         color="orange"
+                        disabled={busyTaskIds.has(item.id)}
                         onClick={() => onSkip(item)}
                         aria-label={`跳过本次：${item.title}`}
                       >

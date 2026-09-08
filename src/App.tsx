@@ -13,7 +13,7 @@ import {
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { ArrowLeft, Pencil, Settings, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AddRecordSheet } from './components/AddRecordSheet';
 import { BottomNav } from './components/BottomNav';
 import { CookingRecordSheet } from './components/CookingRecordSheet';
@@ -34,6 +34,7 @@ import { relatedRecordKey } from './relatedRecords';
 import {
   advanceTask,
   bulkUpdateItems,
+  claimReminderDate,
   deleteRecord,
   deleteNote,
   deleteTask,
@@ -50,6 +51,7 @@ import {
   parseBackup,
   permanentlyDeleteTrashEntry,
   restoreRecord,
+  reopenRecurringTask,
   restoreTrashEntry,
   setReminderEnabled,
   updateRecord,
@@ -173,6 +175,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent>();
+  const taskActionsRef = useRef(new Set<string>());
+  const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
 
   const refresh = async (includeSeedData = true) => {
     const [data, trash] = await Promise.all([loadAppData(includeSeedData), loadTrash()]);
@@ -216,17 +220,15 @@ export default function App() {
   useEffect(() => {
     if (loading || !notificationsEnabled || Notification.permission !== 'granted') return;
     const today = dateKey();
-    if (localStorage.getItem('life-manual-notified-date') === today) return;
-    const reminderDays = new Set([0, 3, 7]);
     const taskDays = tasks
       .filter((item) => !item.completed && item.dueDate)
       .map((item) => daysFromToday(item.dueDate!, today));
     const documentDays = documents
       .filter((item) => item.expiryDate)
       .map((item) => daysFromToday(item.expiryDate!, today));
-    const dueTasks = taskDays.filter((days) => reminderDays.has(days)).length;
+    const dueTasks = taskDays.filter((days) => days >= 0 && days <= 7).length;
     const overdueTasks = taskDays.filter((days) => days < 0).length;
-    const expiring = documentDays.filter((days) => reminderDays.has(days)).length;
+    const expiring = documentDays.filter((days) => days >= 0 && days <= 7).length;
     const expired = documentDays.filter((days) => days < 0).length;
     if (!dueTasks && !overdueTasks && !expiring && !expired) return;
     const parts = [
@@ -235,15 +237,20 @@ export default function App() {
       expiring ? `${expiring} 份资料将在 7 天内到期` : '',
       expired ? `${expired} 份资料已过期` : '',
     ].filter(Boolean);
-    navigator.serviceWorker.ready
+    claimReminderDate(today)
+      .then((claimed) => {
+        if (!claimed) return undefined;
+        return navigator.serviceWorker.ready;
+      })
       .then((registration) =>
-        registration.showNotification('生活手册提醒', {
-          body: parts.join('，'),
-          icon: '/icon.svg',
-          tag: `life-manual-reminder-${today}`,
-        }),
+        registration
+          ? registration.showNotification('生活手册提醒', {
+              body: parts.join('，'),
+              icon: '/icon.svg',
+              tag: `life-manual-reminder-${today}`,
+            })
+          : undefined,
       )
-      .then(() => localStorage.setItem('life-manual-notified-date', today))
       .catch(() => undefined);
   }, [documents, loading, notificationsEnabled, tasks]);
   useEffect(() => {
@@ -329,18 +336,120 @@ export default function App() {
     }
   }
   async function toggleTask(item: TaskItem) {
-    const updated = {
-      ...item,
-      completed: !item.completed,
-      completedAt: item.completed ? undefined : Date.now(),
-      skipped: item.completed ? undefined : false,
-    };
-    if (!item.completed && item.repeat) {
+    if (taskActionsRef.current.has(item.id)) return;
+    taskActionsRef.current.add(item.id);
+    setBusyTaskIds((current) => new Set(current).add(item.id));
+    try {
+      const updated = {
+        ...item,
+        completed: !item.completed,
+        completedAt: item.completed ? undefined : Date.now(),
+        skipped: item.completed ? undefined : false,
+      };
+      if (item.completed && item.repeat) {
+        const linkedGenerated = tasks.find(
+          (task) => task.generatedFromTaskId === item.id && !task.completed && !task.deletedAt,
+        );
+        const legacySeriesTasks = linkedGenerated
+          ? []
+          : tasks.filter(
+              (task) =>
+                !task.generatedFromTaskId &&
+                !task.deletedAt &&
+                task.id !== item.id &&
+                task.title === item.title &&
+                task.repeat === item.repeat &&
+                task.repeatInterval === item.repeatInterval &&
+                task.repeatUnit === item.repeatUnit &&
+                task.repeatAnchorDate === item.repeatAnchorDate &&
+                task.createdAt >= (item.completedAt || item.createdAt),
+            );
+        if (legacySeriesTasks.some((task) => task.completed)) {
+          setErrorToast('这个重复计划已有后续完成记录，不能直接恢复较早的一次');
+          return;
+        }
+        const generated = linkedGenerated || legacySeriesTasks.find((task) => !task.completed);
+        if (generated) {
+          await reopenRecurringTask(updated, generated.id);
+          setTasks((current) =>
+            current
+              .filter((task) => task.id !== generated.id)
+              .map((task) => (task.id === item.id ? updated : task)),
+          );
+          setToast('已恢复，并撤销自动创建的下一次待办');
+          return;
+        }
+        if (tasks.some((task) => task.generatedFromTaskId === item.id)) {
+          setErrorToast('后续待办已经完成或删除，不能直接恢复这一次');
+          return;
+        }
+        if (
+          trashItems.some(
+            (entry) =>
+              entry.kind === 'task' &&
+              (entry.item.generatedFromTaskId === item.id ||
+                (!entry.item.generatedFromTaskId &&
+                  entry.item.id !== item.id &&
+                  entry.item.title === item.title &&
+                  entry.item.repeat === item.repeat &&
+                  entry.item.repeatInterval === item.repeatInterval &&
+                  entry.item.repeatUnit === item.repeatUnit &&
+                  entry.item.repeatAnchorDate === item.repeatAnchorDate &&
+                  entry.item.createdAt >= (item.completedAt || item.createdAt))),
+          )
+        ) {
+          setErrorToast('自动生成的下一次待办在回收站中，请先处理它再恢复这一次');
+          return;
+        }
+      }
+      if (!item.completed && item.repeat) {
+        const dueDate = nextTaskDueDate(item);
+        if (!dueDate) {
+          await advanceTask(updated);
+          setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
+          setToast('已完成，重复计划也已结束');
+          return;
+        }
+        const next: TaskItem = {
+          ...item,
+          id: crypto.randomUUID(),
+          completed: false,
+          completedAt: undefined,
+          skipped: undefined,
+          dueDate,
+          createdAt: Date.now(),
+          generatedFromTaskId: item.id,
+        };
+        await advanceTask(updated, next);
+        setTasks((current) => [
+          next,
+          ...current.map((task) => (task.id === item.id ? updated : task)),
+        ]);
+        setToast(`已创建下一次：${next.dueDate}`);
+        return;
+      }
+      await updateTask(updated);
+      setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
+    } finally {
+      taskActionsRef.current.delete(item.id);
+      setBusyTaskIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }
+  async function skipTask(item: TaskItem) {
+    if (taskActionsRef.current.has(item.id)) return;
+    taskActionsRef.current.add(item.id);
+    setBusyTaskIds((current) => new Set(current).add(item.id));
+    try {
+      const updated = { ...item, completed: true, completedAt: Date.now(), skipped: true };
       const dueDate = nextTaskDueDate(item);
       if (!dueDate) {
         await advanceTask(updated);
         setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
-        setToast('已完成，重复计划也已结束');
+        setToast('已跳过，本次重复计划到此结束');
         return;
       }
       const next: TaskItem = {
@@ -351,39 +460,22 @@ export default function App() {
         skipped: undefined,
         dueDate,
         createdAt: Date.now(),
+        generatedFromTaskId: item.id,
       };
       await advanceTask(updated, next);
       setTasks((current) => [
         next,
         ...current.map((task) => (task.id === item.id ? updated : task)),
       ]);
-      setToast(`已创建下一次：${next.dueDate}`);
-      return;
+      setToast(`已跳过本次，下一次：${dueDate}`);
+    } finally {
+      taskActionsRef.current.delete(item.id);
+      setBusyTaskIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
     }
-    await updateTask(updated);
-    setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
-  }
-  async function skipTask(item: TaskItem) {
-    const updated = { ...item, completed: true, completedAt: Date.now(), skipped: true };
-    const dueDate = nextTaskDueDate(item);
-    if (!dueDate) {
-      await advanceTask(updated);
-      setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
-      setToast('已跳过，本次重复计划到此结束');
-      return;
-    }
-    const next: TaskItem = {
-      ...item,
-      id: crypto.randomUUID(),
-      completed: false,
-      completedAt: undefined,
-      skipped: undefined,
-      dueDate,
-      createdAt: Date.now(),
-    };
-    await advanceTask(updated, next);
-    setTasks((current) => [next, ...current.map((task) => (task.id === item.id ? updated : task))]);
-    setToast(`已跳过本次，下一次：${dueDate}`);
   }
   async function toggleFavorite(item: Recipe) {
     const updated = { ...item, favorite: !item.favorite };
@@ -937,6 +1029,7 @@ export default function App() {
               onDelete={removeTask}
               onSkip={skipTask}
               onAdd={() => startAdd('tasks')}
+              busyTaskIds={busyTaskIds}
               relatedRecordLabels={relatedRecordLabels}
               onOpenRelated={(reference) => {
                 window.location.hash = `${reference.kind === 'recipe' ? 'recipes' : 'documents'}/${reference.id}`;

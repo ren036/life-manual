@@ -4,6 +4,12 @@ export function localDateKey(date = new Date()): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+export function monthDayForRepeat(dueDate?: string, configured?: number): number {
+  if (configured && configured >= 1 && configured <= 31) return Math.floor(configured);
+  const day = dueDate && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) ? Number(dueDate.slice(8, 10)) : 1;
+  return day >= 1 && day <= 31 ? day : 1;
+}
+
 function parseDate(value: string): Date {
   return new Date(`${value}T00:00:00`);
 }
@@ -70,7 +76,7 @@ export function nextTaskDueDate(task: TaskItem, today = localDateKey()): string 
       weekdays,
     );
   } else {
-    const day = Math.min(31, Math.max(1, task.repeatMonthDay || anchor.getDate()));
+    const day = monthDayForRepeat(task.repeatAnchorDate || currentKey, task.repeatMonthDay);
     next = monthlyDate(threshold, interval, day);
     if (task.overduePolicy !== '从完成日期顺延')
       while (next <= todayDate) next = monthlyDate(next, interval, day);

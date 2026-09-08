@@ -247,11 +247,35 @@ export async function advanceTask(item: TaskItem, next?: TaskItem): Promise<void
   await complete(transaction);
 }
 
+export async function reopenRecurringTask(item: TaskItem, generatedTaskId: string): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(TASKS_STORE, 'readwrite');
+  const store = transaction.objectStore(TASKS_STORE);
+  store.put(item);
+  store.delete(generatedTaskId);
+  await complete(transaction);
+}
+
 export async function setReminderEnabled(enabled: boolean): Promise<void> {
   const database = await openDatabase();
   const transaction = database.transaction(SETTINGS_STORE, 'readwrite');
   transaction.objectStore(SETTINGS_STORE).put(enabled, 'reminders-enabled');
   await complete(transaction);
+}
+
+export async function claimReminderDate(date: string): Promise<boolean> {
+  const database = await openDatabase();
+  const transaction = database.transaction(SETTINGS_STORE, 'readwrite');
+  const store = transaction.objectStore(SETTINGS_STORE);
+  const key = 'last-reminder-date';
+  const previous = (await requestResult(store.get(key))) as string | undefined;
+  if (previous === date) {
+    await complete(transaction);
+    return false;
+  }
+  store.put(date, key);
+  await complete(transaction);
+  return true;
 }
 
 export async function deleteRecord(item: Recipe | DocumentItem): Promise<PendingAttachment[]> {
@@ -570,6 +594,7 @@ function isTask(value: unknown): value is TaskItem {
     (value.completedAt === undefined ||
       (typeof value.completedAt === 'number' && Number.isFinite(value.completedAt))) &&
     isOptionalBoolean(value.skipped) &&
+    isOptionalString(value.generatedFromTaskId) &&
     (value.relatedRecord === undefined || isRelatedRecord(value.relatedRecord)) &&
     isOptionalFiniteNumber(value.deletedAt)
   );
@@ -631,6 +656,14 @@ export function parseBackup(value: unknown): LifeManualBackup {
     !hasUniqueIds(value.attachments)
   )
     throw new Error('备份中存在重复的数据 ID');
+  const availableAttachmentIds = new Set(value.attachments.map((file) => file.id));
+  const referencedAttachmentIds = [
+    ...value.recipes.flatMap(attachmentIds),
+    ...value.documents.flatMap(attachmentIds),
+    ...notes.flatMap((note) => (note.audio ? [note.audio.id] : [])),
+  ];
+  if (referencedAttachmentIds.some((id) => !availableAttachmentIds.has(id)))
+    throw new Error('备份缺少记录所引用的附件');
   return {
     version: CURRENT_BACKUP_VERSION,
     exportedAt: value.exportedAt,

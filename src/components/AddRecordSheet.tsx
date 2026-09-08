@@ -33,6 +33,7 @@ import { categoryOptions, parseTags } from '../categories';
 import { parseIngredients } from '../ingredients';
 import { recognizeDocument } from '../ocr';
 import { parseRelatedRecordKey, relatedRecordKey } from '../relatedRecords';
+import { monthDayForRepeat } from '../recurrence';
 import { getAttachmentFiles } from '../storage/database';
 import { AttachmentPicker } from './AttachmentPicker';
 import type {
@@ -145,8 +146,12 @@ export function AddRecordSheet({
         ? (initialItem.repeatWeekdays || []).map(String)
         : [],
     );
+    const initialDueDate =
+      initialItem && 'completed' in initialItem ? initialItem.dueDate || '' : '';
     setRepeatMonthDay(
-      initialItem && 'completed' in initialItem ? initialItem.repeatMonthDay || 1 : 1,
+      initialItem && 'completed' in initialItem
+        ? monthDayForRepeat(initialDueDate, initialItem.repeatMonthDay)
+        : 1,
     );
     setRepeatEndDate(
       initialItem && 'completed' in initialItem ? initialItem.repeatEndDate || '' : '',
@@ -329,6 +334,8 @@ export function AddRecordSheet({
           completed: initialItem && 'completed' in initialItem ? initialItem.completed : false,
           completedAt:
             initialItem && 'completed' in initialItem ? initialItem.completedAt : undefined,
+          generatedFromTaskId:
+            initialItem && 'completed' in initialItem ? initialItem.generatedFromTaskId : undefined,
         };
       const newFiles = [...files, ...keptSteps.flatMap((step) => step.attachments)].filter(
         (attachment): attachment is PendingAttachment => !!attachment.file,
@@ -419,7 +426,11 @@ export function AddRecordSheet({
                 type="date"
                 label="截止日期（可选）"
                 value={dueDate}
-                onChange={(e) => setDueDate(e.currentTarget.value)}
+                onChange={(e) => {
+                  const value = e.currentTarget.value;
+                  setDueDate(value);
+                  if (value) setRepeatMonthDay(monthDayForRepeat(value));
+                }}
                 radius="md"
               />
             )}
@@ -492,7 +503,12 @@ export function AddRecordSheet({
                       <Select
                         label="重复方式"
                         value={repeat}
-                        onChange={(value) => setRepeat((value || '不重复') as TaskRepeat)}
+                        onChange={(value) => {
+                          const nextRepeat = (value || '不重复') as TaskRepeat;
+                          setRepeat(nextRepeat);
+                          if (nextRepeat === '每月' && dueDate)
+                            setRepeatMonthDay(monthDayForRepeat(dueDate));
+                        }}
                         data={['不重复', '每天', '每周', '每月', '自定义']}
                         allowDeselect={false}
                         radius="md"

@@ -35,36 +35,44 @@ function transactionComplete(transaction) {
   });
 }
 
+async function claimReminderDate(database, today) {
+  const transaction = database.transaction('settings', 'readwrite');
+  const store = transaction.objectStore('settings');
+  const key = 'last-reminder-date';
+  const previous = await requestResult(store.get(key));
+  if (previous === today) {
+    await transactionComplete(transaction);
+    return false;
+  }
+  store.put(today, key);
+  await transactionComplete(transaction);
+  return true;
+}
+
 async function showDueReminders() {
   const database = await openDatabase();
   if (!database.objectStoreNames.contains('settings')) return;
   const today = dateKey();
-  const [enabled, lastReminder] = await Promise.all([
-    requestResult(
-      database.transaction('settings').objectStore('settings').get('reminders-enabled'),
-    ),
-    requestResult(
-      database.transaction('settings').objectStore('settings').get('last-background-reminder-date'),
-    ),
-  ]);
+  const enabled = await requestResult(
+    database.transaction('settings').objectStore('settings').get('reminders-enabled'),
+  );
   if (enabled !== true) return;
-  if (lastReminder === today) return;
   const [tasks, documents] = await Promise.all([
     requestResult(database.transaction('tasks').objectStore('tasks').getAll()),
     requestResult(database.transaction('documents').objectStore('documents').getAll()),
   ]);
-  const reminderDays = new Set([0, 3, 7]);
   const taskDays = tasks
     .filter((item) => !item.deletedAt && !item.completed && item.dueDate)
     .map((item) => daysFromToday(item.dueDate, today));
   const documentDays = documents
     .filter((item) => !item.deletedAt && item.expiryDate)
     .map((item) => daysFromToday(item.expiryDate, today));
-  const dueTasks = taskDays.filter((days) => reminderDays.has(days)).length;
+  const dueTasks = taskDays.filter((days) => days >= 0 && days <= 7).length;
   const overdueTasks = taskDays.filter((days) => days < 0).length;
-  const expiring = documentDays.filter((days) => reminderDays.has(days)).length;
+  const expiring = documentDays.filter((days) => days >= 0 && days <= 7).length;
   const expired = documentDays.filter((days) => days < 0).length;
   if (!dueTasks && !overdueTasks && !expiring && !expired) return;
+  if (!(await claimReminderDate(database, today))) return;
   const parts = [
     dueTasks ? `${dueTasks} 个待办将在 7 天内到期` : '',
     overdueTasks ? `${overdueTasks} 个待办已逾期` : '',
@@ -76,9 +84,6 @@ async function showDueReminders() {
     icon: '/icon.svg',
     tag: `life-manual-reminder-${today}`,
   });
-  const transaction = database.transaction('settings', 'readwrite');
-  transaction.objectStore('settings').put(today, 'last-background-reminder-date');
-  await transactionComplete(transaction);
 }
 
 async function cacheAppShell() {

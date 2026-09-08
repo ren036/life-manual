@@ -25,34 +25,40 @@ export function DocumentsPage({
   onOpen: (item: DocumentItem) => void;
   onAdd: () => void;
 }) {
-  const [filter, setFilter] = useState('全部');
+  const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortMode>('最近添加');
   const categories = [
-    '全部',
-    '重要',
-    '已过期',
-    '7 天内',
-    '30 天内',
-    ...new Set(documents.map((item) => item.category)),
-    ...new Set(documents.flatMap((item) => item.tags || []).map((tag) => `#${tag}`)),
+    { value: 'all', label: '全部' },
+    { value: 'special:important', label: '重要' },
+    { value: 'special:overdue', label: '已过期' },
+    { value: 'special:within7', label: '7 天内' },
+    { value: 'special:within30', label: '30 天内' },
+    ...[...new Set(documents.map((item) => item.category))].map((category) => ({
+      value: `category:${category}`,
+      label: category,
+    })),
+    ...[...new Set(documents.flatMap((item) => item.tags || []))].map((tag) => ({
+      value: `tag:${tag}`,
+      label: `#${tag}`,
+    })),
   ];
   const shown = useMemo(
     () =>
       documents
         .filter(
           (item) =>
-            (filter === '全部' || filter === '重要'
-              ? filter === '全部' || item.important
-              : filter === '已过期'
+            (filter === 'all' || filter === 'special:important'
+              ? filter === 'all' || item.important
+              : filter === 'special:overdue'
                 ? dueStatus(item.expiryDate) === 'overdue'
-                : filter === '7 天内'
+                : filter === 'special:within7'
                   ? ['today', 'within7'].includes(dueStatus(item.expiryDate))
-                  : filter === '30 天内'
+                  : filter === 'special:within30'
                     ? ['today', 'within7', 'within30'].includes(dueStatus(item.expiryDate))
-                    : filter.startsWith('#')
-                      ? item.tags?.includes(filter.slice(1))
-                      : item.category === filter) &&
+                    : filter.startsWith('tag:')
+                      ? item.tags?.includes(filter.slice(4))
+                      : item.category === filter.slice(9)) &&
             `${item.title} ${item.description} ${item.ocrText || ''} ${item.category} ${(item.tags || []).join(' ')}`
               .toLowerCase()
               .includes(query.toLowerCase()),
@@ -90,13 +96,13 @@ export function DocumentsPage({
       <Group gap="xs" wrap="wrap">
         {categories.map((item) => (
           <Button
-            key={item}
+            key={item.value}
             size="compact-sm"
             radius="lg"
-            variant={filter === item ? 'filled' : 'light'}
-            onClick={() => setFilter(item)}
+            variant={filter === item.value ? 'filled' : 'light'}
+            onClick={() => setFilter(item.value)}
           >
-            {item}
+            {item.label}
           </Button>
         ))}
       </Group>

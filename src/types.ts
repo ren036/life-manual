@@ -95,6 +95,7 @@ export interface TaskItem {
   createdAt: number;
   completedAt?: number;
   skipped?: boolean;
+  generatedFromTaskId?: string;
   relatedRecord?: RelatedRecordRef;
   deletedAt?: number;
 }
