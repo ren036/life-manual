@@ -42,6 +42,16 @@ function formatBytes(value = 0) {
     ? `${Math.max(0, Math.round(value / 1024))} KB`
     : `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
+function formatDeploymentTime(value: string) {
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(new Date(value));
+}
 
 export function SettingsSheet({
   open,
@@ -212,6 +222,9 @@ export function SettingsSheet({
             {message}
           </Text>
         )}
+        <Text c="dimmed" size="xs" ta="center" pt="xs">
+          版本 v{__APP_VERSION__} · 上次部署 {formatDeploymentTime(__DEPLOYED_AT__)}
+        </Text>
       </Stack>
     </Drawer>
   );
