@@ -18,14 +18,13 @@ import {
   CheckSquare,
   FileText,
   FileUp,
+  Download,
   Search,
   Utensils,
 } from 'lucide-react';
 import { ReactNode, useMemo, useState } from 'react';
+import { daysFromDate, dueLabel } from '../dueDates';
 import type { AddMode, AppTab, DocumentItem, Recipe, TaskItem } from '../types';
-function dateKey(date = new Date()) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
 interface Props {
   recipes: Recipe[];
   documents: DocumentItem[];
@@ -34,6 +33,8 @@ interface Props {
   onAdd: (mode: AddMode) => void;
   onOpenRecipe: (item: Recipe) => void;
   onOpenDocument: (item: DocumentItem) => void;
+  backupOverdue: boolean;
+  onBackup: () => void;
 }
 function ResultButton({
   icon,
@@ -81,19 +82,24 @@ export function HomePage({
   onAdd,
   onOpenRecipe,
   onOpenDocument,
+  backupOverdue,
+  onBackup,
 }: Props) {
   const [query, setQuery] = useState('');
   const pending = tasks.filter((item) => !item.completed);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
   const dueTasks = pending
-    .filter((item) => item.dueDate && new Date(`${item.dueDate}T00:00:00`) <= today)
+    .filter((item) => {
+      const days = daysFromDate(item.dueDate);
+      return days !== undefined && days <= 7;
+    })
+    .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''))
     .slice(0, 3);
   const expiringDocuments = documents
     .filter((item) => {
-      if (!item.expiryDate) return false;
-      return (new Date(`${item.expiryDate}T00:00:00`).getTime() - today.getTime()) / 86400000 <= 30;
+      const days = daysFromDate(item.expiryDate);
+      return days !== undefined && days >= 0 && days <= 30;
     })
+    .sort((a, b) => (a.expiryDate || '').localeCompare(b.expiryDate || ''))
     .slice(0, 3);
   const keyword = query.trim().toLowerCase();
   const results = useMemo(
@@ -110,7 +116,7 @@ export function HomePage({
               .slice(0, 3),
             documents: documents
               .filter((item) =>
-                `${item.title} ${item.description} ${item.category} ${(item.tags || []).join(' ')}`
+                `${item.title} ${item.description} ${item.ocrText || ''} ${item.category} ${(item.tags || []).join(' ')}`
                   .toLowerCase()
                   .includes(keyword),
               )
@@ -141,6 +147,28 @@ export function HomePage({
           查看待办
         </Button>
       </Paper>
+      {backupOverdue && (
+        <Paper radius="xl" p="md" bg="yellow.0" withBorder>
+          <Group wrap="nowrap" justify="space-between">
+            <Group wrap="nowrap">
+              <ThemeIcon color="yellow" variant="light" radius="xl">
+                <Download size={18} />
+              </ThemeIcon>
+              <Stack gap={1}>
+                <Text fw={700} size="sm">
+                  该备份生活手册了
+                </Text>
+                <Text c="dimmed" size="xs">
+                  距离上次备份已经超过 30 天
+                </Text>
+              </Stack>
+            </Group>
+            <Button size="compact-sm" color="yellow.8" onClick={onBackup}>
+              立即备份
+            </Button>
+          </Group>
+        </Paper>
+      )}
       {(dueTasks.length > 0 || expiringDocuments.length > 0) && (
         <Paper radius="xl" p="md" bg="orange.0" withBorder>
           <Group gap="xs" mb="sm">
@@ -155,7 +183,7 @@ export function HomePage({
                 key={item.id}
                 icon={<CheckSquare size={17} />}
                 title={item.title}
-                detail={item.dueDate === dateKey() ? '今天截止' : '待办已逾期'}
+                detail={dueLabel(item.dueDate).replace('到期', '截止')}
                 onClick={() => onNavigate('tasks')}
               />
             ))}
@@ -164,7 +192,7 @@ export function HomePage({
                 key={item.id}
                 icon={<CalendarClock size={17} />}
                 title={item.title}
-                detail={`${item.expiryDate} 到期`}
+                detail={dueLabel(item.expiryDate)}
                 onClick={() => onOpenDocument(item)}
               />
             ))}
@@ -295,7 +323,11 @@ export function HomePage({
                 </Text>
               </Paper>
             ))}
-            {!recipes.length && <Text c="dimmed">还没有记录菜品</Text>}
+            {!recipes.length && (
+              <Button variant="light" onClick={() => onAdd('recipes')}>
+                添加第一道菜
+              </Button>
+            )}
           </SimpleGrid>
           <Group justify="space-between">
             <Title order={3} size="h4">
@@ -331,7 +363,11 @@ export function HomePage({
                 </Group>
               </Paper>
             ))}
-            {!documents.length && <Text c="dimmed">还没有保存资料</Text>}
+            {!documents.length && (
+              <Button variant="light" onClick={() => onAdd('documents')}>
+                上传第一份资料
+              </Button>
+            )}
           </Stack>
         </>
       )}

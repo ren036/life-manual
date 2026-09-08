@@ -13,27 +13,17 @@ import {
 import { CalendarClock, FileText, Search, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AttachmentPreview } from '../components/AttachmentPreview';
+import { dueLabel, dueStatus } from '../dueDates';
 import type { DocumentItem } from '../types';
-function daysUntil(value?: string) {
-  if (!value) return undefined;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.ceil((new Date(`${value}T00:00:00`).getTime() - today.getTime()) / 86400000);
-}
-function expiryLabel(value?: string) {
-  const days = daysUntil(value);
-  if (days === undefined) return '';
-  if (days < 0) return `已过期 ${Math.abs(days)} 天`;
-  if (days === 0) return '今天到期';
-  return `${days} 天后到期`;
-}
 type SortMode = '最近添加' | '名称排序' | '到期优先';
 export function DocumentsPage({
   documents,
   onOpen,
+  onAdd,
 }: {
   documents: DocumentItem[];
   onOpen: (item: DocumentItem) => void;
+  onAdd: () => void;
 }) {
   const [filter, setFilter] = useState('全部');
   const [query, setQuery] = useState('');
@@ -41,7 +31,9 @@ export function DocumentsPage({
   const categories = [
     '全部',
     '重要',
-    '即将到期',
+    '已过期',
+    '7 天内',
+    '30 天内',
     ...new Set(documents.map((item) => item.category)),
     ...new Set(documents.flatMap((item) => item.tags || []).map((tag) => `#${tag}`)),
   ];
@@ -52,12 +44,16 @@ export function DocumentsPage({
           (item) =>
             (filter === '全部' || filter === '重要'
               ? filter === '全部' || item.important
-              : filter === '即将到期'
-                ? daysUntil(item.expiryDate) !== undefined && daysUntil(item.expiryDate)! <= 30
-                : filter.startsWith('#')
-                  ? item.tags?.includes(filter.slice(1))
-                  : item.category === filter) &&
-            `${item.title} ${item.description} ${item.category} ${(item.tags || []).join(' ')}`
+              : filter === '已过期'
+                ? dueStatus(item.expiryDate) === 'overdue'
+                : filter === '7 天内'
+                  ? ['today', 'within7'].includes(dueStatus(item.expiryDate))
+                  : filter === '30 天内'
+                    ? ['today', 'within7', 'within30'].includes(dueStatus(item.expiryDate))
+                    : filter.startsWith('#')
+                      ? item.tags?.includes(filter.slice(1))
+                      : item.category === filter) &&
+            `${item.title} ${item.description} ${item.ocrText || ''} ${item.category} ${(item.tags || []).join(' ')}`
               .toLowerCase()
               .includes(query.toLowerCase()),
         )
@@ -150,11 +146,11 @@ export function DocumentsPage({
                   {item.expiryDate && <CalendarClock size={13} />}
                   <Text
                     size="xs"
-                    c={item.expiryDate && (daysUntil(item.expiryDate) || 0) <= 0 ? 'red' : 'dimmed'}
+                    c={dueStatus(item.expiryDate) === 'overdue' ? 'red' : 'dimmed'}
                     lineClamp={1}
                   >
                     {item.expiryDate
-                      ? expiryLabel(item.expiryDate)
+                      ? dueLabel(item.expiryDate)
                       : item.attachmentName || item.description || '暂无说明'}
                   </Text>
                 </Group>
@@ -169,9 +165,12 @@ export function DocumentsPage({
         ))}
       </Stack>
       {!shown.length && (
-        <Text ta="center" c="dimmed" py="xl">
-          这个分类还没有资料。
-        </Text>
+        <Paper bg="white" radius="xl" p="xl" ta="center">
+          <Stack align="center" gap="sm">
+            <Text c="dimmed">{documents.length ? '这个分类还没有资料。' : '还没有保存资料。'}</Text>
+            {!documents.length && <Button onClick={onAdd}>上传第一份资料</Button>}
+          </Stack>
+        </Paper>
       )}
     </Stack>
   );

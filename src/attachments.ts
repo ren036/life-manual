@@ -19,5 +19,8 @@ export function attachmentIds(item: Recipe | DocumentItem): string[] {
   return [
     ...recordAttachments(item),
     ...(item.steps || []).flatMap((step) => step.attachments),
+    ...('ingredients' in item
+      ? (item.cookingRecords || []).flatMap((record) => record.attachments)
+      : []),
   ].map((file) => file.id);
 }

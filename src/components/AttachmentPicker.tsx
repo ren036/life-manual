@@ -4,6 +4,7 @@ import {
   Button,
   Center,
   FileButton,
+  Group,
   Image,
   Paper,
   Select,
@@ -11,7 +12,7 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
-import { FilePlus2, FileText, X } from 'lucide-react';
+import { Camera, FilePlus2, FileText, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { optimizeAttachments } from '../imageCompression';
 import { AttachmentPreview } from './AttachmentPreview';
@@ -33,6 +34,7 @@ export function AttachmentPicker({
   destinations,
   onMove,
   onReturn,
+  enableCamera = false,
 }: {
   files: DraftAttachment[];
   onChange: (files: DraftAttachment[]) => void;
@@ -41,6 +43,7 @@ export function AttachmentPicker({
   destinations?: { id: string; label: string }[];
   onMove?: (attachmentId: string, stepId?: string) => void;
   onReturn?: (attachmentId: string) => void;
+  enableCamera?: boolean;
 }) {
   const [error, setError] = useState('');
   const [movingId, setMovingId] = useState<string>();
@@ -60,17 +63,32 @@ export function AttachmentPicker({
   }
   return (
     <Stack gap="xs">
-      <FileButton
-        multiple
-        accept={imagesOnly ? 'image/*' : 'image/*,.pdf,.doc,.docx,.xls,.xlsx'}
-        onChange={(selected) => void pick(selected)}
-      >
-        {(props) => (
-          <Button {...props} variant="light" leftSection={<FilePlus2 size={18} />} fullWidth>
-            {label}
-          </Button>
+      <Group grow>
+        <FileButton
+          multiple
+          accept={imagesOnly ? 'image/*' : 'image/*,.pdf,.doc,.docx,.xls,.xlsx'}
+          onChange={(selected) => void pick(selected)}
+        >
+          {(props) => (
+            <Button {...props} variant="light" leftSection={<FilePlus2 size={18} />} fullWidth>
+              {label}
+            </Button>
+          )}
+        </FileButton>
+        {enableCamera && (
+          <FileButton
+            accept="image/*"
+            capture="environment"
+            onChange={(selected) => selected && void pick([selected])}
+          >
+            {(props) => (
+              <Button {...props} variant="light" leftSection={<Camera size={18} />}>
+                拍照扫描
+              </Button>
+            )}
+          </FileButton>
         )}
-      </FileButton>
+      </Group>
       <Text c="dimmed" size="xs">
         大图片会在设备上自动压缩后保存，原图不会上传。
       </Text>

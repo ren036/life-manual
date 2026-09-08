@@ -1,6 +1,16 @@
-import { attachmentIds } from '../attachments';
+import { attachmentIds, recordAttachments } from '../attachments';
+import { isTrashExpired } from '../dataSafety';
 import { seedDocuments, seedRecipes, seedTasks } from '../data/seed';
-import type { AppData, DocumentItem, PendingAttachment, Recipe, TaskItem } from '../types';
+import type {
+  AppData,
+  AddMode,
+  Attachment,
+  DocumentItem,
+  PendingAttachment,
+  Recipe,
+  TaskItem,
+  TrashEntry,
+} from '../types';
 
 const DATABASE_NAME = 'life-manual';
 const DATABASE_VERSION = 4;
@@ -10,6 +20,10 @@ const RECIPES_STORE = 'recipes';
 const DOCUMENTS_STORE = 'documents';
 const TASKS_STORE = 'tasks';
 const SETTINGS_STORE = 'settings';
+const CURRENT_BACKUP_VERSION = 3;
+const PRE_IMPORT_BACKUP_KEY = 'pre-import-backup';
+
+export type ImportMode = 'merge' | 'replace';
 
 export interface BackupFile {
   id: string;
@@ -19,7 +33,7 @@ export interface BackupFile {
 }
 
 export interface LifeManualBackup {
-  version: 1;
+  version: 3;
   exportedAt: string;
   recipes: Recipe[];
   documents: DocumentItem[];
@@ -105,8 +119,9 @@ function toDocument(record: LegacyRecord): DocumentItem {
   };
 }
 
-export async function loadAppData(): Promise<AppData> {
+export async function loadAppData(includeSeedData = true): Promise<AppData> {
   const database = await openDatabase();
+  await purgeExpiredTrash(database);
   let [recipes, documents, tasks, initialized] = await Promise.all([
     requestResult(
       database.transaction(RECIPES_STORE).objectStore(RECIPES_STORE).getAll(),
@@ -127,17 +142,21 @@ export async function loadAppData(): Promise<AppData> {
     )) as LegacyRecord[];
     recipes = legacy.length
       ? legacy.filter((item) => item.kind === '菜品').map(toRecipe)
-      : [...seedRecipes];
+      : includeSeedData
+        ? [...seedRecipes]
+        : [];
     documents = legacy.length
       ? legacy.filter((item) => item.kind !== '菜品').map(toDocument)
-      : [...seedDocuments];
+      : includeSeedData
+        ? [...seedDocuments]
+        : [];
     const transaction = database.transaction([RECIPES_STORE, DOCUMENTS_STORE], 'readwrite');
     recipes.forEach((item) => transaction.objectStore(RECIPES_STORE).put(item));
     documents.forEach((item) => transaction.objectStore(DOCUMENTS_STORE).put(item));
     await complete(transaction);
   }
   if (!initialized && !tasks.length) {
-    tasks = [...seedTasks];
+    tasks = includeSeedData ? [...seedTasks] : [];
     const transaction = database.transaction(TASKS_STORE, 'readwrite');
     tasks.forEach((item) => transaction.objectStore(TASKS_STORE).put(item));
     await complete(transaction);
@@ -149,7 +168,11 @@ export async function loadAppData(): Promise<AppData> {
   }
   const newest = <T extends { createdAt: number }>(items: T[]) =>
     items.sort((a, b) => b.createdAt - a.createdAt);
-  return { recipes: newest(recipes), documents: newest(documents), tasks: newest(tasks) };
+  return {
+    recipes: newest(recipes.filter((item) => item.deletedAt === undefined)),
+    documents: newest(documents.filter((item) => item.deletedAt === undefined)),
+    tasks: newest(tasks.filter((item) => item.deletedAt === undefined)),
+  };
 }
 
 async function putItem(
@@ -184,20 +207,163 @@ export async function updateRecord(
 export const insertTask = (item: TaskItem) => putItem(TASKS_STORE, item);
 export const updateTask = (item: TaskItem) => putItem(TASKS_STORE, item);
 
-export async function deleteRecord(item: Recipe | DocumentItem): Promise<void> {
+export async function bulkUpdateItems(
+  mode: AddMode,
+  items: Array<Recipe | DocumentItem | TaskItem>,
+): Promise<void> {
+  if (!items.length) return;
+  const storeName =
+    mode === 'recipes' ? RECIPES_STORE : mode === 'documents' ? DOCUMENTS_STORE : TASKS_STORE;
   const database = await openDatabase();
-  const store = 'ingredients' in item ? RECIPES_STORE : DOCUMENTS_STORE;
-  const transaction = database.transaction([store, ATTACHMENTS_STORE], 'readwrite');
-  transaction.objectStore(store).delete(item.id);
-  attachmentIds(item).forEach((id) => transaction.objectStore(ATTACHMENTS_STORE).delete(id));
+  const transaction = database.transaction(storeName, 'readwrite');
+  const store = transaction.objectStore(storeName);
+  items.forEach((item) => store.put(item));
   await complete(transaction);
 }
 
-export async function deleteTask(id: string): Promise<void> {
+export async function advanceTask(item: TaskItem, next?: TaskItem): Promise<void> {
   const database = await openDatabase();
   const transaction = database.transaction(TASKS_STORE, 'readwrite');
-  transaction.objectStore(TASKS_STORE).delete(id);
+  const store = transaction.objectStore(TASKS_STORE);
+  store.put(item);
+  if (next) store.put(next);
   await complete(transaction);
+}
+
+export async function setReminderEnabled(enabled: boolean): Promise<void> {
+  const database = await openDatabase();
+  const transaction = database.transaction(SETTINGS_STORE, 'readwrite');
+  transaction.objectStore(SETTINGS_STORE).put(enabled, 'reminders-enabled');
+  await complete(transaction);
+}
+
+export async function deleteRecord(item: Recipe | DocumentItem): Promise<PendingAttachment[]> {
+  await putItem('ingredients' in item ? RECIPES_STORE : DOCUMENTS_STORE, {
+    ...item,
+    deletedAt: Date.now(),
+  });
+  return [];
+}
+
+export const restoreRecord = (item: Recipe | DocumentItem, files: PendingAttachment[]) => {
+  const { deletedAt: _deletedAt, ...restored } = item;
+  return putItem(
+    'ingredients' in item ? RECIPES_STORE : DOCUMENTS_STORE,
+    restored as Recipe | DocumentItem,
+    files,
+  );
+};
+
+export async function deleteTask(item: TaskItem): Promise<void> {
+  await putItem(TASKS_STORE, { ...item, deletedAt: Date.now() });
+}
+
+async function readTrash(database: IDBDatabase): Promise<TrashEntry[]> {
+  const [recipes, documents, tasks] = await Promise.all([
+    requestResult(
+      database.transaction(RECIPES_STORE).objectStore(RECIPES_STORE).getAll(),
+    ) as Promise<Recipe[]>,
+    requestResult(
+      database.transaction(DOCUMENTS_STORE).objectStore(DOCUMENTS_STORE).getAll(),
+    ) as Promise<DocumentItem[]>,
+    requestResult(database.transaction(TASKS_STORE).objectStore(TASKS_STORE).getAll()) as Promise<
+      TaskItem[]
+    >,
+  ]);
+  return [
+    ...recipes
+      .filter((item): item is Recipe & { deletedAt: number } => typeof item.deletedAt === 'number')
+      .map((item) => ({ kind: 'recipe' as const, item })),
+    ...documents
+      .filter(
+        (item): item is DocumentItem & { deletedAt: number } => typeof item.deletedAt === 'number',
+      )
+      .map((item) => ({ kind: 'document' as const, item })),
+    ...tasks
+      .filter(
+        (item): item is TaskItem & { deletedAt: number } => typeof item.deletedAt === 'number',
+      )
+      .map((item) => ({ kind: 'task' as const, item })),
+  ].sort((a, b) => b.item.deletedAt - a.item.deletedAt);
+}
+
+async function permanentlyDeleteEntries(
+  database: IDBDatabase,
+  entries: TrashEntry[],
+): Promise<void> {
+  if (!entries.length) return;
+  const removedRecordKeys = new Set(
+    entries
+      .filter((entry) => entry.kind !== 'task')
+      .map((entry) => `${entry.kind}:${entry.item.id}`),
+  );
+  const tasks = removedRecordKeys.size
+    ? ((await requestResult(
+        database.transaction(TASKS_STORE).objectStore(TASKS_STORE).getAll(),
+      )) as TaskItem[])
+    : [];
+  const deletedTaskIds = new Set(
+    entries.filter((entry) => entry.kind === 'task').map((entry) => entry.item.id),
+  );
+  const transaction = database.transaction(
+    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, ATTACHMENTS_STORE],
+    'readwrite',
+  );
+  const attachments = transaction.objectStore(ATTACHMENTS_STORE);
+  const taskStore = transaction.objectStore(TASKS_STORE);
+  tasks
+    .filter(
+      (task) =>
+        !deletedTaskIds.has(task.id) &&
+        task.relatedRecord &&
+        removedRecordKeys.has(`${task.relatedRecord.kind}:${task.relatedRecord.id}`),
+    )
+    .forEach((task) => taskStore.put({ ...task, relatedRecord: undefined }));
+  entries.forEach((entry) => {
+    const store =
+      entry.kind === 'recipe'
+        ? RECIPES_STORE
+        : entry.kind === 'document'
+          ? DOCUMENTS_STORE
+          : TASKS_STORE;
+    transaction.objectStore(store).delete(entry.item.id);
+    if (entry.kind !== 'task') attachmentIds(entry.item).forEach((id) => attachments.delete(id));
+  });
+  await complete(transaction);
+}
+
+async function purgeExpiredTrash(database: IDBDatabase): Promise<void> {
+  const expired = (await readTrash(database)).filter((entry) =>
+    isTrashExpired(entry.item.deletedAt),
+  );
+  await permanentlyDeleteEntries(database, expired);
+}
+
+export async function loadTrash(): Promise<TrashEntry[]> {
+  const database = await openDatabase();
+  await purgeExpiredTrash(database);
+  return readTrash(database);
+}
+
+export async function restoreTrashEntry(entry: TrashEntry): Promise<void> {
+  const { deletedAt: _deletedAt, ...restored } = entry.item;
+  const store =
+    entry.kind === 'recipe'
+      ? RECIPES_STORE
+      : entry.kind === 'document'
+        ? DOCUMENTS_STORE
+        : TASKS_STORE;
+  await putItem(store, restored as Recipe | DocumentItem | TaskItem);
+}
+
+export async function permanentlyDeleteTrashEntry(entry: TrashEntry): Promise<void> {
+  const database = await openDatabase();
+  await permanentlyDeleteEntries(database, [entry]);
+}
+
+export async function emptyTrash(): Promise<void> {
+  const database = await openDatabase();
+  await permanentlyDeleteEntries(database, await readTrash(database));
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
@@ -209,11 +375,232 @@ function blobToBase64(blob: Blob): Promise<string> {
   });
 }
 
-function base64ToBlob(value: string, type: string): Blob {
+function base64ToFile(value: string, name: string, type: string): File {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-  return new Blob([bytes], { type });
+  return new File([bytes], name, { type });
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string';
+}
+
+function isOptionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === 'boolean';
+}
+
+function isOptionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || (typeof value === 'number' && Number.isFinite(value));
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isAttachment(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    typeof value.id === 'string' &&
+    !!value.id &&
+    typeof value.name === 'string' &&
+    typeof value.type === 'string'
+  );
+}
+
+function isRelatedRecord(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    (value.kind === 'recipe' || value.kind === 'document') &&
+    typeof value.id === 'string' &&
+    !!value.id
+  );
+}
+
+function hasValidContent(value: Record<string, unknown>): boolean {
+  return (
+    (value.tags === undefined || isStringArray(value.tags)) &&
+    (value.attachments === undefined ||
+      (Array.isArray(value.attachments) && value.attachments.every(isAttachment))) &&
+    (value.steps === undefined ||
+      (Array.isArray(value.steps) &&
+        value.steps.every(
+          (step) =>
+            isObject(step) &&
+            typeof step.id === 'string' &&
+            !!step.id &&
+            typeof step.text === 'string' &&
+            Array.isArray(step.attachments) &&
+            step.attachments.every(isAttachment),
+        )))
+  );
+}
+
+function isCookingRecord(value: unknown): boolean {
+  return (
+    isObject(value) &&
+    typeof value.id === 'string' &&
+    !!value.id &&
+    typeof value.date === 'string' &&
+    typeof value.notes === 'string' &&
+    typeof value.createdAt === 'number' &&
+    Number.isFinite(value.createdAt) &&
+    Array.isArray(value.attachments) &&
+    value.attachments.every(isAttachment)
+  );
+}
+
+function isRecipe(value: unknown): value is Recipe {
+  return (
+    isObject(value) &&
+    hasValidContent(value) &&
+    typeof value.id === 'string' &&
+    !!value.id &&
+    typeof value.title === 'string' &&
+    typeof value.notes === 'string' &&
+    isStringArray(value.ingredients) &&
+    typeof value.category === 'string' &&
+    typeof value.date === 'string' &&
+    typeof value.createdAt === 'number' &&
+    Number.isFinite(value.createdAt) &&
+    isOptionalBoolean(value.favorite) &&
+    isOptionalString(value.attachmentName) &&
+    isOptionalBoolean(value.hasFile) &&
+    isOptionalFiniteNumber(value.deletedAt) &&
+    (value.cookingRecords === undefined ||
+      (Array.isArray(value.cookingRecords) && value.cookingRecords.every(isCookingRecord)))
+  );
+}
+
+function isDocument(value: unknown): value is DocumentItem {
+  return (
+    isObject(value) &&
+    hasValidContent(value) &&
+    typeof value.id === 'string' &&
+    !!value.id &&
+    typeof value.title === 'string' &&
+    typeof value.description === 'string' &&
+    typeof value.category === 'string' &&
+    typeof value.important === 'boolean' &&
+    typeof value.date === 'string' &&
+    typeof value.createdAt === 'number' &&
+    Number.isFinite(value.createdAt) &&
+    isOptionalString(value.expiryDate) &&
+    isOptionalString(value.ocrText) &&
+    isOptionalString(value.attachmentName) &&
+    isOptionalBoolean(value.hasFile) &&
+    isOptionalBoolean(value.isImage) &&
+    isOptionalFiniteNumber(value.deletedAt)
+  );
+}
+
+function isTask(value: unknown): value is TaskItem {
+  return (
+    isObject(value) &&
+    typeof value.id === 'string' &&
+    !!value.id &&
+    typeof value.title === 'string' &&
+    typeof value.notes === 'string' &&
+    typeof value.category === 'string' &&
+    (value.tags === undefined || isStringArray(value.tags)) &&
+    ['普通', '重要', '紧急'].includes(String(value.priority)) &&
+    (value.repeat === undefined ||
+      ['不重复', '每天', '每周', '每月', '自定义'].includes(String(value.repeat))) &&
+    (value.repeatInterval === undefined ||
+      (typeof value.repeatInterval === 'number' &&
+        Number.isInteger(value.repeatInterval) &&
+        value.repeatInterval >= 1)) &&
+    (value.repeatUnit === undefined || ['天', '周', '月'].includes(String(value.repeatUnit))) &&
+    (value.repeatWeekdays === undefined ||
+      (Array.isArray(value.repeatWeekdays) &&
+        value.repeatWeekdays.every(
+          (day) => typeof day === 'number' && Number.isInteger(day) && day >= 0 && day <= 6,
+        ) &&
+        new Set(value.repeatWeekdays).size === value.repeatWeekdays.length)) &&
+    (value.repeatMonthDay === undefined ||
+      (typeof value.repeatMonthDay === 'number' &&
+        Number.isInteger(value.repeatMonthDay) &&
+        value.repeatMonthDay >= 1 &&
+        value.repeatMonthDay <= 31)) &&
+    isOptionalString(value.repeatEndDate) &&
+    isOptionalString(value.repeatAnchorDate) &&
+    (value.overduePolicy === undefined ||
+      ['按原计划顺延', '从完成日期顺延'].includes(String(value.overduePolicy))) &&
+    typeof value.completed === 'boolean' &&
+    typeof value.createdAt === 'number' &&
+    Number.isFinite(value.createdAt) &&
+    isOptionalString(value.dueDate) &&
+    (value.completedAt === undefined ||
+      (typeof value.completedAt === 'number' && Number.isFinite(value.completedAt))) &&
+    isOptionalBoolean(value.skipped) &&
+    (value.relatedRecord === undefined || isRelatedRecord(value.relatedRecord)) &&
+    isOptionalFiniteNumber(value.deletedAt)
+  );
+}
+
+function isBackupFile(value: unknown): value is BackupFile {
+  return (
+    isObject(value) &&
+    typeof value.id === 'string' &&
+    !!value.id &&
+    typeof value.name === 'string' &&
+    typeof value.type === 'string' &&
+    typeof value.data === 'string' &&
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value.data)
+  );
+}
+
+function hasUniqueIds(items: Array<{ id: string }>): boolean {
+  return new Set(items.map((item) => item.id)).size === items.length;
+}
+
+export function parseBackup(value: unknown): LifeManualBackup {
+  if (!isObject(value)) throw new Error('备份内容不是有效对象');
+  if (value.version !== 1 && value.version !== 2 && value.version !== CURRENT_BACKUP_VERSION)
+    throw new Error(`不支持的备份版本：${String(value.version)}`);
+  if (typeof value.exportedAt !== 'string' || !Number.isFinite(Date.parse(value.exportedAt)))
+    throw new Error('备份导出时间无效');
+  if (!Array.isArray(value.recipes) || !value.recipes.every(isRecipe))
+    throw new Error('菜谱数据结构不完整');
+  if (!Array.isArray(value.documents) || !value.documents.every(isDocument))
+    throw new Error('资料数据结构不完整');
+  if (!Array.isArray(value.tasks) || !value.tasks.every(isTask))
+    throw new Error('待办数据结构不完整');
+  if (!Array.isArray(value.attachments) || !value.attachments.every(isBackupFile))
+    throw new Error('附件数据结构或编码无效');
+  if (
+    !hasUniqueIds(value.recipes) ||
+    !hasUniqueIds(value.documents) ||
+    !hasUniqueIds(value.tasks) ||
+    !hasUniqueIds(value.attachments)
+  )
+    throw new Error('备份中存在重复的数据 ID');
+  return {
+    version: CURRENT_BACKUP_VERSION,
+    exportedAt: value.exportedAt,
+    recipes: value.recipes,
+    documents: value.documents,
+    tasks: value.tasks,
+    attachments: value.attachments,
+  };
+}
+
+function attachmentNames(items: Array<Recipe | DocumentItem>): Map<string, string> {
+  return new Map(
+    items
+      .flatMap((item) => [
+        ...recordAttachments(item),
+        ...(item.steps || []).flatMap((step) => step.attachments),
+        ...('ingredients' in item
+          ? (item.cookingRecords || []).flatMap((record) => record.attachments)
+          : []),
+      ])
+      .map((attachment) => [attachment.id, attachment.name]),
+  );
 }
 
 export async function exportBackup(): Promise<LifeManualBackup> {
@@ -235,16 +622,20 @@ export async function exportBackup(): Promise<LifeManualBackup> {
       database.transaction(ATTACHMENTS_STORE).objectStore(ATTACHMENTS_STORE).getAll(),
     ) as Promise<Blob[]>,
   ]);
+  const names = attachmentNames([...recipes, ...documents]);
   const attachments = await Promise.all(
-    files.map(async (file, index) => ({
-      id: String(keys[index]),
-      name: '附件',
-      type: file.type,
-      data: await blobToBase64(file),
-    })),
+    files.map(async (file, index) => {
+      const id = String(keys[index]);
+      return {
+        id,
+        name: names.get(id) || (file instanceof File ? file.name : '') || '附件',
+        type: file.type,
+        data: await blobToBase64(file),
+      };
+    }),
   );
   return {
-    version: 1,
+    version: CURRENT_BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     recipes,
     documents,
@@ -253,33 +644,86 @@ export async function exportBackup(): Promise<LifeManualBackup> {
   };
 }
 
-export function validateBackup(value: unknown): value is LifeManualBackup {
-  const backup = value as Partial<LifeManualBackup>;
-  return (
-    backup?.version === 1 &&
-    Array.isArray(backup.recipes) &&
-    Array.isArray(backup.documents) &&
-    Array.isArray(backup.tasks) &&
-    Array.isArray(backup.attachments)
-  );
-}
-
-export async function importBackup(backup: LifeManualBackup): Promise<void> {
-  const database = await openDatabase();
+async function writeBackup(
+  database: IDBDatabase,
+  backup: LifeManualBackup,
+  mode: ImportMode,
+): Promise<void> {
+  const files = backup.attachments.map((file) => ({
+    id: file.id,
+    value: base64ToFile(file.data, file.name || '附件', file.type),
+  }));
   const transaction = database.transaction(
     [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, ATTACHMENTS_STORE],
     'readwrite',
   );
-  [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, ATTACHMENTS_STORE].forEach((store) =>
-    transaction.objectStore(store).clear(),
-  );
+  if (mode === 'replace')
+    [RECIPES_STORE, DOCUMENTS_STORE, TASKS_STORE, ATTACHMENTS_STORE].forEach((store) =>
+      transaction.objectStore(store).clear(),
+    );
   backup.recipes.forEach((item) => transaction.objectStore(RECIPES_STORE).put(item));
   backup.documents.forEach((item) => transaction.objectStore(DOCUMENTS_STORE).put(item));
   backup.tasks.forEach((item) => transaction.objectStore(TASKS_STORE).put(item));
-  backup.attachments.forEach((file) =>
-    transaction.objectStore(ATTACHMENTS_STORE).put(base64ToBlob(file.data, file.type), file.id),
-  );
+  files.forEach((file) => transaction.objectStore(ATTACHMENTS_STORE).put(file.value, file.id));
   await complete(transaction);
+}
+
+async function containsImportedData(
+  database: IDBDatabase,
+  backup: LifeManualBackup,
+): Promise<boolean> {
+  const groups: Array<[string, Array<{ id: string }>]> = [
+    [RECIPES_STORE, backup.recipes],
+    [DOCUMENTS_STORE, backup.documents],
+    [TASKS_STORE, backup.tasks],
+    [ATTACHMENTS_STORE, backup.attachments],
+  ];
+  const results = await Promise.all(
+    groups.map(async ([store, items]) => {
+      const keys = (await requestResult(
+        database.transaction(store).objectStore(store).getAllKeys(),
+      )) as IDBValidKey[];
+      const saved = new Set(keys.map(String));
+      return items.every((item) => saved.has(item.id));
+    }),
+  );
+  return results.every(Boolean);
+}
+
+export async function importBackup(backup: LifeManualBackup, mode: ImportMode): Promise<void> {
+  const database = await openDatabase();
+  const previous = await exportBackup();
+  const snapshotTransaction = database.transaction(SETTINGS_STORE, 'readwrite');
+  snapshotTransaction.objectStore(SETTINGS_STORE).put(previous, PRE_IMPORT_BACKUP_KEY);
+  await complete(snapshotTransaction);
+  let committed = false;
+  try {
+    await writeBackup(database, backup, mode);
+    committed = true;
+    if (!(await containsImportedData(database, backup))) throw new Error('导入结果校验失败');
+  } catch (error) {
+    if (!committed) throw error;
+    try {
+      const savedSnapshot = await requestResult(
+        database.transaction(SETTINGS_STORE).objectStore(SETTINGS_STORE).get(PRE_IMPORT_BACKUP_KEY),
+      );
+      const rollbackBackup = parseBackup(savedSnapshot ?? previous);
+      await writeBackup(database, rollbackBackup, 'replace');
+      if (!(await containsImportedData(database, rollbackBackup)))
+        throw new Error('回滚结果校验失败');
+    } catch {
+      throw new Error('导入失败，自动回滚也未能完成，请重新载入应用并检查数据');
+    }
+    throw new Error(`导入失败，已恢复导入前的数据。${error instanceof Error ? error.message : ''}`);
+  } finally {
+    try {
+      const cleanup = database.transaction(SETTINGS_STORE, 'readwrite');
+      cleanup.objectStore(SETTINGS_STORE).delete(PRE_IMPORT_BACKUP_KEY);
+      await complete(cleanup);
+    } catch {
+      /* 临时快照会在下次导入时覆盖，不影响本次导入结果 */
+    }
+  }
 }
 
 export async function getAttachmentUrl(id: string): Promise<string | undefined> {
@@ -288,6 +732,21 @@ export async function getAttachmentUrl(id: string): Promise<string | undefined> 
     database.transaction(ATTACHMENTS_STORE).objectStore(ATTACHMENTS_STORE).get(id),
   )) as Blob | undefined;
   return file ? URL.createObjectURL(file) : undefined;
+}
+
+export async function getAttachmentFiles(items: Attachment[]): Promise<PendingAttachment[]> {
+  const database = await openDatabase();
+  const store = database.transaction(ATTACHMENTS_STORE).objectStore(ATTACHMENTS_STORE);
+  const files = await Promise.all(
+    items.map(async (item) => {
+      const blob = (await requestResult(store.get(item.id))) as Blob | undefined;
+      if (!blob) return undefined;
+      const file =
+        blob instanceof File ? blob : new File([blob], item.name, { type: item.type || blob.type });
+      return { ...item, file };
+    }),
+  );
+  return files.filter((file): file is PendingAttachment => file !== undefined);
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {

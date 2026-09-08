@@ -1,5 +1,5 @@
 export type AppTab = 'home' | 'recipes' | 'documents' | 'tasks';
-export type AddMode = Exclude<AppTab, 'home'>;
+export type AddMode = 'recipes' | 'documents' | 'tasks';
 
 export interface Attachment {
   id: string;
@@ -26,6 +26,14 @@ export interface RecordContent {
   steps?: RecordStep[];
 }
 
+export interface CookingRecord {
+  id: string;
+  date: string;
+  notes: string;
+  attachments: Attachment[];
+  createdAt: number;
+}
+
 export interface Recipe extends RecordContent {
   id: string;
   title: string;
@@ -37,6 +45,8 @@ export interface Recipe extends RecordContent {
   createdAt: number;
   attachmentName?: string;
   hasFile?: boolean;
+  cookingRecords?: CookingRecord[];
+  deletedAt?: number;
 }
 
 export interface DocumentItem extends RecordContent {
@@ -47,27 +57,52 @@ export interface DocumentItem extends RecordContent {
   important: boolean;
   date: string;
   expiryDate?: string;
+  ocrText?: string;
   createdAt: number;
   attachmentName?: string;
   hasFile?: boolean;
   isImage?: boolean;
+  deletedAt?: number;
 }
 
 export type TaskPriority = '普通' | '重要' | '紧急';
-export type TaskRepeat = '不重复' | '每天' | '每周' | '每月';
+export type TaskRepeat = '不重复' | '每天' | '每周' | '每月' | '自定义';
+export type TaskRepeatUnit = '天' | '周' | '月';
+export type TaskOverduePolicy = '按原计划顺延' | '从完成日期顺延';
+
+export interface RelatedRecordRef {
+  kind: 'recipe' | 'document';
+  id: string;
+}
 
 export interface TaskItem {
   id: string;
   title: string;
   notes: string;
   category: string;
+  tags?: string[];
   dueDate?: string;
   priority: TaskPriority;
   repeat?: TaskRepeat;
+  repeatInterval?: number;
+  repeatUnit?: TaskRepeatUnit;
+  repeatWeekdays?: number[];
+  repeatMonthDay?: number;
+  repeatEndDate?: string;
+  repeatAnchorDate?: string;
+  overduePolicy?: TaskOverduePolicy;
   completed: boolean;
   createdAt: number;
   completedAt?: number;
+  skipped?: boolean;
+  relatedRecord?: RelatedRecordRef;
+  deletedAt?: number;
 }
+
+export type TrashEntry =
+  | { kind: 'recipe'; item: Recipe & { deletedAt: number } }
+  | { kind: 'document'; item: DocumentItem & { deletedAt: number } }
+  | { kind: 'task'; item: TaskItem & { deletedAt: number } };
 
 export interface AppData {
   recipes: Recipe[];

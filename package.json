@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit -p tsconfig.app.json && vite build",
+    "test": "vitest run",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "preview": "vite preview --host 0.0.0.0"
@@ -15,9 +16,11 @@
     "@mantine/hooks": "^9.6.0",
     "@mantine/modals": "^9.6.0",
     "@mantine/notifications": "^9.6.0",
+    "@tesseract.js-data/chi_sim": "^1.0.0",
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
@@ -25,6 +28,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "prettier": "^3.9.6",
     "typescript": "~5.7.2",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "vitest": "^3.2.4"
   }
 }

@@ -17,6 +17,8 @@ import {
   HardDrive,
   MonitorDown,
   ShieldCheck,
+  Tags,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
@@ -30,6 +32,10 @@ interface Props {
   onImport: (file: File) => void;
   installAvailable: boolean;
   onInstall: () => void;
+  trashCount: number;
+  onOpenTrash: () => void;
+  lastBackupAt?: number;
+  onOpenOrganize: () => void;
 }
 function formatBytes(value = 0) {
   return value < 1024 * 1024
@@ -46,6 +52,10 @@ export function SettingsSheet({
   onImport,
   installAvailable,
   onInstall,
+  trashCount,
+  onOpenTrash,
+  lastBackupAt,
+  onOpenOrganize,
 }: Props) {
   const [usage, setUsage] = useState(0);
   const [quota, setQuota] = useState(0);
@@ -139,7 +149,7 @@ export function SettingsSheet({
         <Action
           icon={notificationsEnabled ? <Bell size={18} /> : <BellOff size={18} />}
           title="到期通知"
-          description={notificationsEnabled ? '已开启，每天最多提醒一次' : '已关闭'}
+          description={notificationsEnabled ? '已开启；支持的浏览器可每日后台检查' : '已关闭'}
           onClick={onToggleNotifications}
         />
         <Action
@@ -151,8 +161,24 @@ export function SettingsSheet({
         <Action
           icon={<Download size={18} />}
           title="导出完整备份"
-          description="包含记录、待办和附件"
+          description={
+            lastBackupAt
+              ? `上次备份：${new Date(lastBackupAt).toLocaleDateString('zh-CN')}`
+              : '尚未备份；包含记录、待办和附件'
+          }
           onClick={onExport}
+        />
+        <Action
+          icon={<Tags size={18} />}
+          title="批量整理"
+          description="统一分类并为多条内容追加标签"
+          onClick={onOpenOrganize}
+        />
+        <Action
+          icon={<Trash2 size={18} />}
+          title="回收站"
+          description={trashCount ? `${trashCount} 项内容将在 30 天后自动删除` : '回收站是空的'}
+          onClick={onOpenTrash}
         />
         <FileButton accept="application/json,.json" onChange={(file) => file && onImport(file)}>
           {(props) => (
@@ -167,7 +193,7 @@ export function SettingsSheet({
                       从备份恢复
                     </Text>
                     <Text c="dimmed" size="xs">
-                      恢复前会再次确认
+                      支持合并或覆盖，失败会自动回滚
                     </Text>
                   </Stack>
                 </Group>

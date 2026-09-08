@@ -1,5 +1,6 @@
 import {
   Anchor,
+  ActionIcon,
   Badge,
   Button,
   Group,
@@ -12,11 +13,22 @@ import {
   ThemeIcon,
   Title,
 } from '@mantine/core';
-import { FileText, Share2, Star } from 'lucide-react';
+import {
+  BellPlus,
+  Camera,
+  Check,
+  Circle,
+  FileText,
+  Pencil,
+  Share2,
+  Star,
+  Trash2,
+} from 'lucide-react';
 import { ReactNode, useEffect, useState } from 'react';
 import { recordAttachments } from '../attachments';
 import { getAttachmentUrl } from '../storage/database';
-import type { Attachment, DocumentItem, Recipe } from '../types';
+import { dueLabel } from '../dueDates';
+import type { Attachment, CookingRecord, DocumentItem, Recipe, TaskItem } from '../types';
 function DetailAttachment({ attachment }: { attachment: Attachment }) {
   const [url, setUrl] = useState<string>();
   const [failed, setFailed] = useState(false);
@@ -107,13 +119,26 @@ function DetailSection({
 export function RecordDetailPage({
   item,
   onToggleFavorite,
+  onAddCookingRecord,
+  onEditCookingRecord,
+  onDeleteCookingRecord,
+  relatedTasks,
+  onCreateRelatedTask,
 }: {
   item: Recipe | DocumentItem;
   onToggleFavorite?: (item: Recipe) => void;
+  onAddCookingRecord?: (item: Recipe) => void;
+  onEditCookingRecord?: (item: Recipe, record: CookingRecord) => void;
+  onDeleteCookingRecord?: (item: Recipe, record: CookingRecord) => void;
+  relatedTasks: TaskItem[];
+  onCreateRelatedTask: (item: Recipe | DocumentItem) => void;
 }) {
   const isRecipe = 'ingredients' in item;
   const attachments = recordAttachments(item);
   const steps = item.steps || [];
+  const cookingRecords = isRecipe
+    ? [...(item.cookingRecords || [])].sort((a, b) => b.createdAt - a.createdAt)
+    : [];
   const description = isRecipe ? item.notes : item.description;
   const [shareLabel, setShareLabel] = useState('分享');
   async function share() {
@@ -188,6 +213,64 @@ export function RecordDetailPage({
         </DetailSection>
       )}
       {isRecipe && (
+        <DetailSection
+          title="下厨记录"
+          aside={cookingRecords.length ? `已做 ${cookingRecords.length} 次` : undefined}
+        >
+          <Stack gap="lg">
+            <Button
+              variant={cookingRecords.length ? 'light' : 'filled'}
+              leftSection={<Camera size={18} />}
+              onClick={() => onAddCookingRecord?.(item)}
+            >
+              记录这次下厨
+            </Button>
+            {cookingRecords.length ? (
+              cookingRecords.map((record, index) => (
+                <Stack key={record.id} gap="sm">
+                  <Group justify="space-between">
+                    <Text fw={700}>第 {cookingRecords.length - index} 次</Text>
+                    <Group gap={3} wrap="nowrap">
+                      <Text c="dimmed" size="sm">
+                        {new Date(`${record.date}T00:00:00`).toLocaleDateString('zh-CN')}
+                      </Text>
+                      <ActionIcon
+                        variant="subtle"
+                        color="gray"
+                        size="sm"
+                        onClick={() => onEditCookingRecord?.(item, record)}
+                        aria-label={`编辑第 ${cookingRecords.length - index} 次下厨记录`}
+                      >
+                        <Pencil size={14} />
+                      </ActionIcon>
+                      <ActionIcon
+                        variant="subtle"
+                        color="red"
+                        size="sm"
+                        onClick={() => onDeleteCookingRecord?.(item, record)}
+                        aria-label={`删除第 ${cookingRecords.length - index} 次下厨记录`}
+                      >
+                        <Trash2 size={14} />
+                      </ActionIcon>
+                    </Group>
+                  </Group>
+                  {record.notes && <Text>{record.notes}</Text>}
+                  <SimpleGrid cols={{ base: 2, sm: 3 }}>
+                    {record.attachments.map((attachment) => (
+                      <DetailAttachment key={attachment.id} attachment={attachment} />
+                    ))}
+                  </SimpleGrid>
+                </Stack>
+              ))
+            ) : (
+              <Text c="dimmed" ta="center">
+                做完后拍张照片，慢慢看见自己的进步。
+              </Text>
+            )}
+          </Stack>
+        </DetailSection>
+      )}
+      {isRecipe && (
         <DetailSection title="食材">
           {item.ingredients.length ? (
             <Group gap="xs">
@@ -208,12 +291,57 @@ export function RecordDetailPage({
       {description && (
         <DetailSection title={isRecipe ? '心得与备注' : '说明'}>
           <Stack gap={4}>
-            {description.split('\\n').map((line, index) => (
-              <Text key={index}>{line || '\\u00a0'}</Text>
+            {description.split('\n').map((line, index) => (
+              <Text key={index}>{line || '\u00a0'}</Text>
             ))}
           </Stack>
         </DetailSection>
       )}
+      {!isRecipe && item.ocrText && (
+        <DetailSection title="识别文字" aside="可用于搜索">
+          <Stack gap={4}>
+            {item.ocrText.split('\n').map((line, index) => (
+              <Text key={index}>{line || '\u00a0'}</Text>
+            ))}
+          </Stack>
+        </DetailSection>
+      )}
+      <DetailSection
+        title="相关待办"
+        aside={relatedTasks.length ? `${relatedTasks.length} 项` : undefined}
+      >
+        <Stack gap="sm">
+          <Button
+            variant={relatedTasks.length ? 'light' : 'filled'}
+            leftSection={<BellPlus size={18} />}
+            onClick={() => onCreateRelatedTask(item)}
+          >
+            添加相关待办
+          </Button>
+          {relatedTasks.map((task) => (
+            <Paper withBorder radius="md" p="sm" key={task.id}>
+              <Group wrap="nowrap">
+                <ThemeIcon
+                  variant={task.completed ? 'filled' : 'light'}
+                  color="green"
+                  radius="xl"
+                  size="sm"
+                >
+                  {task.completed ? <Check size={13} /> : <Circle size={13} />}
+                </ThemeIcon>
+                <Stack gap={0} flex={1}>
+                  <Text fw={650} size="sm" td={task.completed ? 'line-through' : undefined}>
+                    {task.title}
+                  </Text>
+                  <Text c="dimmed" size="xs">
+                    {task.dueDate ? dueLabel(task.dueDate).replace('到期', '截止') : '没有截止日期'}
+                  </Text>
+                </Stack>
+              </Group>
+            </Paper>
+          ))}
+        </Stack>
+      </DetailSection>
       {!!steps.length && (
         <DetailSection title={isRecipe ? '制作步骤' : '操作步骤'} aside={`${steps.length} 步`}>
           <Stack gap="xl">
@@ -234,7 +362,7 @@ export function RecordDetailPage({
           </Stack>
         </DetailSection>
       )}
-      {!description && !steps.length && !attachments.length && (
+      {!description && !steps.length && !attachments.length && !cookingRecords.length && (
         <Text ta="center" c="dimmed" py="xl">
           这条记录还没有更多说明。
         </Text>

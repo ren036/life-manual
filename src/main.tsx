@@ -53,15 +53,7 @@ createRoot(document.getElementById('root')!).render(
 );
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', async () => {
-    const registration = await navigator.serviceWorker.register('/service-worker.js');
-    const announceUpdate = () => window.dispatchEvent(new CustomEvent('life-manual-update'));
-    if (registration.waiting) announceUpdate();
-    registration.addEventListener('updatefound', () => {
-      const worker = registration.installing;
-      worker?.addEventListener('statechange', () => {
-        if (worker.state === 'installed' && navigator.serviceWorker.controller) announceUpdate();
-      });
-    });
+  window.addEventListener('load', () => {
+    void navigator.serviceWorker.register('/service-worker.js');
   });
 }
