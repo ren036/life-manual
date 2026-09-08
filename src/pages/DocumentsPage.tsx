@@ -96,7 +96,7 @@ export function DocumentsPage({
           <Button
             key={item}
             size="compact-sm"
-            radius="xl"
+            radius="lg"
             variant={filter === item ? 'filled' : 'light'}
             onClick={() => setFilter(item)}
           >
@@ -109,7 +109,8 @@ export function DocumentsPage({
           <Paper
             component="button"
             type="button"
-            withBorder
+            bd="none"
+            shadow="xs"
             radius="lg"
             p="sm"
             bg="white"

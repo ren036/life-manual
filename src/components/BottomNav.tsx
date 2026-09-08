@@ -19,12 +19,15 @@ export function BottomNav({
       <Paper
         component="nav"
         aria-label="主要导航"
+        w="100%"
         maw={480}
         mx="auto"
-        p="xs"
-        pb="calc(8px + env(safe-area-inset-bottom))"
+        px="xs"
+        pt={6}
+        pb="calc(6px + env(safe-area-inset-bottom))"
         radius={0}
-        shadow="md"
+        shadow="lg"
+        bg="white"
         withBorder
       >
         <SimpleGrid cols={4} spacing={0}>
@@ -33,12 +36,14 @@ export function BottomNav({
               key={id}
               aria-current={active === id ? 'page' : undefined}
               onClick={() => onChange(id)}
+              py={3}
             >
-              <Stack gap={2} align="center">
+              <Stack gap={1} align="center">
                 <ThemeIcon
                   variant={active === id ? 'light' : 'transparent'}
                   radius="xl"
                   color={active === id ? 'green' : 'gray'}
+                  size={32}
                 >
                   <Icon size={20} />
                 </ThemeIcon>

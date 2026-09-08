@@ -93,7 +93,8 @@ export function RecipesPage({
             <Paper
               component="button"
               type="button"
-              withBorder
+              bd="none"
+              shadow="xs"
               radius="lg"
               p={0}
               bg="white"
@@ -124,7 +125,7 @@ export function RecipesPage({
                   pos="absolute"
                   top={8}
                   right={8}
-                  radius="xl"
+                  radius="lg"
                   color="orange"
                   variant="filled"
                   aria-label="已收藏"

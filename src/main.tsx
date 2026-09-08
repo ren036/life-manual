@@ -10,8 +10,21 @@ import './styles.css';
 
 const theme = createTheme({
   primaryColor: 'green',
-  defaultRadius: 'md',
+  primaryShade: 7,
+  defaultRadius: 'lg',
   fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
+  headings: {
+    fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
+    fontWeight: '800',
+  },
+  defaultGradient: { from: 'green.8', to: 'green.6', deg: 135 },
+  components: {
+    Button: { defaultProps: { radius: 'xl' } },
+    ActionIcon: { defaultProps: { radius: 'xl' } },
+    TextInput: { defaultProps: { radius: 'lg', size: 'md' } },
+    Select: { defaultProps: { radius: 'lg', size: 'md' } },
+    Textarea: { defaultProps: { radius: 'lg', size: 'md' } },
+  },
   colors: {
     green: [
       '#f0f8f3',

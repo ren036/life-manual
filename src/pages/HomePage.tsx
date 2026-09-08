@@ -47,7 +47,16 @@ function ResultButton({
   onClick: () => void;
 }) {
   return (
-    <Paper component="button" type="button" withBorder radius="lg" p="sm" onClick={onClick}>
+    <Paper
+      component="button"
+      type="button"
+      bd="none"
+      bg="white"
+      shadow="xs"
+      radius="xl"
+      p="md"
+      onClick={onClick}
+    >
       <Group wrap="nowrap">
         <ThemeIcon variant="light" radius="xl">
           {icon}
@@ -116,11 +125,11 @@ export function HomePage({
   );
   return (
     <Stack gap="lg">
-      <Paper radius="xl" p="lg" bg="green.7" c="white">
+      <Paper radius="xl" p="lg" bg="green.8" c="white" mih={142}>
         <Text size="xs" opacity={0.8}>
           今天也慢慢来
         </Text>
-        <Title order={2} mt={4} mb="md">
+        <Title order={2} size="h2" mt={6} mb="lg" lh={1.25}>
           {pending.length ? `还有 ${pending.length} 件事等你处理` : '今天的事情都完成了'}
         </Title>
         <Button
@@ -167,7 +176,7 @@ export function HomePage({
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
         placeholder="搜索菜谱、资料或待办"
-        radius="md"
+        size="lg"
       />
       {results ? (
         <Stack gap="xs">
@@ -230,14 +239,18 @@ export function HomePage({
               <Paper
                 component="button"
                 type="button"
-                withBorder
-                radius="lg"
-                p="sm"
+                bd="none"
+                bg="white"
+                shadow="xs"
+                radius="xl"
+                px="xs"
+                py="md"
                 ta="center"
+                mih={94}
                 key={action.mode}
                 onClick={() => onAdd(action.mode)}
               >
-                <ThemeIcon variant="light" radius="xl" mb="xs">
+                <ThemeIcon variant="light" radius="xl" size={40} mb="xs">
                   {action.icon}
                 </ThemeIcon>
                 <Text fw={700} size="sm">
@@ -250,7 +263,9 @@ export function HomePage({
             ))}
           </SimpleGrid>
           <Group justify="space-between">
-            <Title order={3}>最近做过</Title>
+            <Title order={3} size="h4">
+              最近做过
+            </Title>
             <Button variant="subtle" size="compact-sm" onClick={() => onNavigate('recipes')}>
               全部菜谱
             </Button>
@@ -260,13 +275,16 @@ export function HomePage({
               <Paper
                 component="button"
                 type="button"
-                withBorder
-                radius="lg"
-                p="md"
+                bd="none"
+                bg="white"
+                shadow="xs"
+                radius="xl"
+                p="lg"
+                mih={112}
                 key={item.id}
                 onClick={() => onOpenRecipe(item)}
               >
-                <ThemeIcon variant="light" radius="xl" mb="xs">
+                <ThemeIcon variant="light" radius="xl" size={40} mb="xs">
                   <Utensils />
                 </ThemeIcon>
                 <Text fw={700} lineClamp={1}>
@@ -280,7 +298,9 @@ export function HomePage({
             {!recipes.length && <Text c="dimmed">还没有记录菜品</Text>}
           </SimpleGrid>
           <Group justify="space-between">
-            <Title order={3}>最近资料</Title>
+            <Title order={3} size="h4">
+              最近资料
+            </Title>
             <Button variant="subtle" size="compact-sm" onClick={() => onNavigate('documents')}>
               打开资料库
             </Button>
@@ -290,9 +310,11 @@ export function HomePage({
               <Paper
                 component="button"
                 type="button"
-                withBorder
-                radius="lg"
-                p="sm"
+                bd="none"
+                bg="white"
+                shadow="xs"
+                radius="xl"
+                p="md"
                 key={item.id}
                 onClick={() => onOpenDocument(item)}
               >

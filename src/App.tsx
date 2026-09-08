@@ -1,4 +1,15 @@
-import { ActionIcon, Affix, Box, Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
+import {
+  ActionIcon,
+  Affix,
+  Box,
+  Button,
+  Group,
+  Paper,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
 import { ArrowLeft, Pencil, Plus, Settings, Trash2 } from 'lucide-react';
@@ -336,8 +347,8 @@ export default function App() {
   const floatingMode: AddMode = tab === 'home' ? 'tasks' : tab;
   const stickyTop = !online || updateAvailable ? 38 : 0;
   return (
-    <Box component="main" bg="gray.0" mih="100vh">
-      <Paper maw={480} mx="auto" mih="100vh" radius={0} shadow="xl" bg="gray.0">
+    <Box component="main" bg="green.0" mih="100vh">
+      <Paper w="100%" maw={480} mx="auto" mih="100vh" radius={0} shadow="xl" bg="gray.0">
         {!online && (
           <Paper radius={0} p="xs" bg="orange.1">
             <Text ta="center" size="xs" c="orange.9">
@@ -357,63 +368,75 @@ export default function App() {
             </Group>
           </Paper>
         )}
-        <Paper
+        <Box
           component="header"
           pos="sticky"
           top={stickyTop}
-          p="md"
-          radius={0}
+          px="md"
+          py={10}
           bg="gray.0"
-          shadow="xs"
+          style={{ zIndex: 20 }}
         >
-          <Group justify="space-between" wrap="nowrap">
-            <Stack gap={0}>
-              <Text c="green.7" size="xs" fw={800}>
-                我的生活
-              </Text>
-              <Title order={1}>
-                {route.id ? (tab === 'recipes' ? '菜谱详情' : '资料详情') : pageTitles[tab]}
-              </Title>
-            </Stack>
-            {route.id ? (
-              <Group gap="xs" wrap="nowrap">
-                {detailItem && (
-                  <>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      leftSection={<Pencil size={16} />}
-                      onClick={() => startEdit(detailItem)}
-                    >
-                      编辑
-                    </Button>
-                    <ActionIcon
-                      variant="light"
-                      color="red"
-                      size="lg"
-                      radius="xl"
-                      onClick={() => removeRecord(detailItem)}
-                      aria-label="删除记录"
-                    >
-                      <Trash2 size={19} />
-                    </ActionIcon>
-                  </>
-                )}
+          <Group justify="space-between" wrap="nowrap" mih={44}>
+            <Group gap="xs" wrap="nowrap">
+              {route.id && (
                 <ActionIcon
-                  variant="default"
-                  size="lg"
-                  radius="xl"
+                  variant="subtle"
+                  color="gray"
+                  size={36}
                   onClick={() => setTab(tab)}
                   aria-label="返回列表"
                 >
-                  <ArrowLeft size={19} />
+                  <ArrowLeft size={20} />
                 </ActionIcon>
+              )}
+              <Stack gap={1}>
+                <Text c="green.7" size="xs" fw={700}>
+                  {route.id
+                    ? pageTitles[tab]
+                    : tab === 'home'
+                      ? new Intl.DateTimeFormat('zh-CN', {
+                          month: 'long',
+                          day: 'numeric',
+                          weekday: 'short',
+                        }).format(new Date())
+                      : '生活手册'}
+                </Text>
+                <Title order={1} size={24} lh={1.15}>
+                  {route.id ? (tab === 'recipes' ? '菜谱详情' : '资料详情') : pageTitles[tab]}
+                </Title>
+              </Stack>
+            </Group>
+            {route.id ? (
+              <Group gap={2} wrap="nowrap">
+                {detailItem && (
+                  <>
+                    <ActionIcon
+                      variant="subtle"
+                      color="gray"
+                      size={36}
+                      onClick={() => startEdit(detailItem)}
+                      aria-label="编辑记录"
+                    >
+                      <Pencil size={17} />
+                    </ActionIcon>
+                    <ActionIcon
+                      variant="subtle"
+                      color="red"
+                      size={36}
+                      onClick={() => removeRecord(detailItem)}
+                      aria-label="删除记录"
+                    >
+                      <Trash2 size={17} />
+                    </ActionIcon>
+                  </>
+                )}
               </Group>
             ) : (
               <ActionIcon
-                variant="default"
-                size="lg"
-                radius="xl"
+                variant="subtle"
+                color="gray"
+                size={36}
                 onClick={() => setSettingsOpen(true)}
                 aria-label="打开设置"
               >
@@ -421,8 +444,8 @@ export default function App() {
               </ActionIcon>
             )}
           </Group>
-        </Paper>
-        <Box px="md" pt="xs" pb={112}>
+        </Box>
+        <Box px="sm" pt="sm" pb={108}>
           {loading && (
             <Text ta="center" c="dimmed" py="xl">
               正在整理你的记录…
@@ -479,19 +502,24 @@ export default function App() {
         </Box>
         {!route.id && tab !== 'home' && (
           <Affix
-            position={{ bottom: 92, right: 'max(16px, calc((100vw - 480px) / 2 + 16px))' }}
+            position={{
+              bottom: 86,
+              left: 'max(0px, calc(50% - 240px))',
+              right: 'max(0px, calc(50% - 240px))',
+            }}
             zIndex={8}
           >
-            <ActionIcon
-              size={52}
-              radius="xl"
-              color="green"
-              variant="filled"
-              onClick={() => startAdd(floatingMode)}
-              aria-label="新增"
-            >
-              <Plus />
-            </ActionIcon>
+            <Group justify="flex-end" px="md">
+              <ActionIcon
+                size={52}
+                color="green"
+                variant="filled"
+                onClick={() => startAdd(floatingMode)}
+                aria-label="新增"
+              >
+                <Plus size={24} />
+              </ActionIcon>
+            </Group>
           </Affix>
         )}
         <BottomNav active={tab} onChange={setTab} />
