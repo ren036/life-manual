@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Center,
+  Drawer,
   Group,
   Paper,
   Select,
@@ -13,9 +14,14 @@ import {
   TextInput,
   ThemeIcon,
 } from '@mantine/core';
-import { Search, Star, Utensils } from 'lucide-react';
+import { Check, Clipboard, Search, ShoppingCart, Star, Utensils, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AttachmentPreview } from '../components/AttachmentPreview';
+import {
+  buildShoppingList,
+  shoppingAmountLabel,
+  shoppingListText,
+} from '../shoppingList';
 import type { Recipe } from '../types';
 type SortMode = '最近添加' | '名称排序';
 
@@ -41,6 +47,10 @@ export function RecipesPage({
   const [filter, setFilter] = useState('all');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortMode>('最近添加');
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [shoppingOpen, setShoppingOpen] = useState(false);
+  const [copyLabel, setCopyLabel] = useState('复制清单');
   const categories = [
     { value: 'all', label: '全部' },
     { value: 'special:favorite', label: '收藏' },
@@ -77,6 +87,37 @@ export function RecipesPage({
         ),
     [filter, query, recipes, sort],
   );
+  const selectedRecipes = useMemo(
+    () => recipes.filter((recipe) => selectedIds.includes(recipe.id)),
+    [recipes, selectedIds],
+  );
+  const shoppingItems = useMemo(() => buildShoppingList(selectedRecipes), [selectedRecipes]);
+
+  function toggleSelecting() {
+    setSelecting((value) => !value);
+    setSelectedIds([]);
+  }
+
+  function chooseRecipe(item: Recipe) {
+    if (!selecting) {
+      onOpen(item);
+      return;
+    }
+    setSelectedIds((ids) =>
+      ids.includes(item.id) ? ids.filter((id) => id !== item.id) : [...ids, item.id],
+    );
+  }
+
+  async function copyShoppingList() {
+    try {
+      await navigator.clipboard.writeText(shoppingListText(selectedRecipes, shoppingItems));
+      setCopyLabel('已复制');
+      window.setTimeout(() => setCopyLabel('复制清单'), 1600);
+    } catch {
+      setCopyLabel('复制失败');
+    }
+  }
+
   return (
     <Stack gap="md">
       <Group wrap="nowrap" align="stretch">
@@ -98,6 +139,19 @@ export function RecipesPage({
           radius="md"
         />
       </Group>
+      <Group justify="space-between" align="center" gap="sm">
+        <Text size="xs" c="dimmed">
+          {selecting ? '点击菜谱进行多选' : '选几道菜，自动汇总要买的食材'}
+        </Text>
+        <Button
+          size="compact-sm"
+          variant={selecting ? 'light' : 'filled'}
+          leftSection={selecting ? <X size={15} /> : <ShoppingCart size={15} />}
+          onClick={toggleSelecting}
+        >
+          {selecting ? '取消选菜' : '选菜买菜'}
+        </Button>
+      </Group>
       <Group gap="xs" wrap="wrap">
         {categories.map((item) => (
           <Button
@@ -115,6 +169,7 @@ export function RecipesPage({
         <SimpleGrid cols={2} spacing="sm">
           {shown.map((item) => {
             const cover = recipeCover(item);
+            const selected = selectedIds.includes(item.id);
             return (
               <Paper
                 component="button"
@@ -127,7 +182,9 @@ export function RecipesPage({
                 ta="left"
                 pos="relative"
                 key={item.id}
-                onClick={() => onOpen(item)}
+                onClick={() => chooseRecipe(item)}
+                aria-pressed={selecting ? selected : undefined}
+                style={selected ? { outline: '2px solid var(--mantine-color-green-6)' } : undefined}
               >
                 <AspectRatio ratio={4 / 3} bg="green.0">
                   <Box w="100%" h="100%">
@@ -153,6 +210,19 @@ export function RecipesPage({
                     aria-label="已收藏"
                   >
                     <Star size={16} fill="currentColor" />
+                  </ThemeIcon>
+                )}
+                {selecting && (
+                  <ThemeIcon
+                    pos="absolute"
+                    top={8}
+                    left={8}
+                    radius="xl"
+                    color={selected ? 'green' : 'gray'}
+                    variant={selected ? 'filled' : 'light'}
+                    aria-hidden
+                  >
+                    {selected ? <Check size={16} /> : <ShoppingCart size={15} />}
                   </ThemeIcon>
                 )}
                 <Stack gap={4} p="sm">
@@ -182,6 +252,81 @@ export function RecipesPage({
           </Stack>
         </Paper>
       )}
+      {selecting && (
+        <Paper
+          withBorder
+          shadow="md"
+          radius="xl"
+          p="sm"
+          pos="sticky"
+          bottom={76}
+          style={{ zIndex: 10 }}
+        >
+          <Group justify="space-between" wrap="nowrap">
+            <Text size="sm" fw={600}>
+              已选 {selectedIds.length} 道菜
+            </Text>
+            <Button
+              leftSection={<ShoppingCart size={16} />}
+              disabled={!selectedIds.length}
+              onClick={() => {
+                setCopyLabel('复制清单');
+                setShoppingOpen(true);
+              }}
+            >
+              生成采购清单
+            </Button>
+          </Group>
+        </Paper>
+      )}
+      <Drawer
+        opened={shoppingOpen}
+        onClose={() => setShoppingOpen(false)}
+        position="bottom"
+        size="min(82vh, 680px)"
+        radius="xl"
+        title="采购清单"
+        overlayProps={{ backgroundOpacity: 0.42, blur: 3 }}
+      >
+        <Stack gap="md">
+          <Text size="sm" c="dimmed">
+            来自 {selectedRecipes.map((recipe) => recipe.title).join('、')}
+          </Text>
+          {shoppingItems.length ? (
+            <Stack gap="xs">
+              {shoppingItems.map((item) => (
+                <Paper key={item.name} withBorder radius="lg" p="sm">
+                  <Group justify="space-between" align="flex-start" wrap="nowrap">
+                    <Stack gap={2}>
+                      <Text fw={700}>{item.name}</Text>
+                      <Text size="xs" c="dimmed">
+                        用于：{item.recipes.join('、')}
+                      </Text>
+                    </Stack>
+                    <Text size="sm" ta="right">
+                      {shoppingAmountLabel(item)}
+                    </Text>
+                  </Group>
+                </Paper>
+              ))}
+            </Stack>
+          ) : (
+            <Paper bg="gray.0" radius="lg" p="lg" ta="center">
+              <Text c="dimmed">所选菜谱还没有填写食材。</Text>
+            </Paper>
+          )}
+          <Button
+            fullWidth
+            size="md"
+            variant="light"
+            leftSection={<Clipboard size={17} />}
+            disabled={!shoppingItems.length}
+            onClick={() => void copyShoppingList()}
+          >
+            {copyLabel}
+          </Button>
+        </Stack>
+      </Drawer>
     </Stack>
   );
 }
