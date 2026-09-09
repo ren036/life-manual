@@ -37,6 +37,7 @@ import {
   advanceTask,
   bulkUpdateItems,
   claimReminderDate,
+  clearAllData,
   deleteRecord,
   deleteNote,
   deleteTask,
@@ -140,7 +141,7 @@ export default function App() {
     const value = Number(localStorage.getItem(LAST_BACKUP_KEY));
     return Number.isFinite(value) && value > 0 ? value : undefined;
   });
-  const [backupBaseline] = useState(() => {
+  const [backupBaseline, setBackupBaseline] = useState(() => {
     const saved = Number(localStorage.getItem(BACKUP_BASELINE_KEY));
     if (Number.isFinite(saved) && saved > 0) return saved;
     const value = Date.now();
@@ -183,8 +184,8 @@ export default function App() {
   const taskActionsRef = useRef(new Set<string>());
   const [busyTaskIds, setBusyTaskIds] = useState<Set<string>>(new Set());
 
-  const refresh = async (includeSeedData = true) => {
-    const [data, trash] = await Promise.all([loadAppData(includeSeedData), loadTrash()]);
+  const refresh = async () => {
+    const [data, trash] = await Promise.all([loadAppData(), loadTrash()]);
     setRecipes(data.recipes);
     setDocuments(data.documents);
     setTasks(data.tasks);
@@ -625,10 +626,10 @@ export default function App() {
       setErrorToast('删除失败，请重试');
     }
   }
-  async function completeOnboarding(includeExamples: boolean) {
+  async function completeOnboarding() {
     setLoading(true);
     try {
-      await refresh(includeExamples);
+      await refresh();
       localStorage.setItem(ONBOARDING_KEY, 'done');
       setOnboardingOpen(false);
     } finally {
@@ -704,6 +705,43 @@ export default function App() {
           await emptyTrash();
           setTrashItems([]);
           setToast('回收站已清空');
+        } catch {
+          setErrorToast('清空失败，请重试');
+        }
+      },
+    });
+  }
+
+  function confirmClearAllData() {
+    modals.openConfirmModal({
+      centered: true,
+      title: '清空全部数据？',
+      children: (
+        <Stack gap="xs">
+          <Text size="sm">所有菜谱、资料、待办、随记、附件和回收站内容都会被永久删除。</Text>
+          <Text size="sm" c="red" fw={700}>
+            此操作无法撤销，建议先导出完整备份。
+          </Text>
+        </Stack>
+      ),
+      labels: { confirm: '确认清空', cancel: '取消' },
+      confirmProps: { color: 'red' },
+      onConfirm: async () => {
+        try {
+          await clearAllData();
+          setRecipes([]);
+          setDocuments([]);
+          setTasks([]);
+          setNotes([]);
+          setTrashItems([]);
+          setSettingsOpen(false);
+          setLastBackupAt(undefined);
+          localStorage.removeItem(LAST_BACKUP_KEY);
+          const nextBaseline = Date.now();
+          localStorage.setItem(BACKUP_BASELINE_KEY, String(nextBaseline));
+          setBackupBaseline(nextBaseline);
+          setTab('home');
+          setToast('全部数据已清空');
         } catch {
           setErrorToast('清空失败，请重试');
         }
@@ -1113,6 +1151,7 @@ export default function App() {
             setSettingsOpen(false);
             setOrganizeOpen(true);
           }}
+          onClearData={confirmClearAllData}
         />
         <OrganizeSheet
           open={organizeOpen}

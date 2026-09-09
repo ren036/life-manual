@@ -36,6 +36,7 @@ interface Props {
   onOpenTrash: () => void;
   lastBackupAt?: number;
   onOpenOrganize: () => void;
+  onClearData: () => void;
 }
 function formatBytes(value = 0) {
   return value < 1024 * 1024
@@ -66,6 +67,7 @@ export function SettingsSheet({
   onOpenTrash,
   lastBackupAt,
   onOpenOrganize,
+  onClearData,
 }: Props) {
   const [usage, setUsage] = useState(0);
   const [quota, setQuota] = useState(0);
@@ -94,20 +96,22 @@ export function SettingsSheet({
     title,
     description,
     onClick,
+    color = 'green',
   }: {
     icon: ReactNode;
     title: string;
     description: string;
     onClick: () => void;
+    color?: string;
   }) => (
     <UnstyledButton w="100%" onClick={onClick}>
       <Paper withBorder radius="md" p="sm">
         <Group wrap="nowrap">
-          <ThemeIcon variant="light" radius="xl">
+          <ThemeIcon color={color} variant="light" radius="xl">
             {icon}
           </ThemeIcon>
           <Stack gap={0}>
-            <Text fw={650} size="sm">
+            <Text c={color === 'red' ? 'red' : undefined} fw={650} size="sm">
               {title}
             </Text>
             <Text c="dimmed" size="xs">
@@ -211,6 +215,16 @@ export function SettingsSheet({
             </UnstyledButton>
           )}
         </FileButton>
+        <Text c="red" size="xs" fw={700} mt="md">
+          危险操作
+        </Text>
+        <Action
+          icon={<Trash2 size={18} />}
+          title="清空全部数据"
+          description="删除所有记录、附件和回收站内容"
+          color="red"
+          onClick={onClearData}
+        />
         <Group gap={7} align="flex-start" wrap="nowrap">
           <Database size={16} />
           <Text c="dimmed" size="xs">

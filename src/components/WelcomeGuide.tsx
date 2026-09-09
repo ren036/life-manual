@@ -1,15 +1,4 @@
-import {
-  Button,
-  Checkbox,
-  Group,
-  Modal,
-  Paper,
-  Progress,
-  Stack,
-  Text,
-  ThemeIcon,
-  Title,
-} from '@mantine/core';
+import { Button, Group, Modal, Progress, Stack, Text, ThemeIcon, Title } from '@mantine/core';
 import { Database, Heart, ShieldCheck } from 'lucide-react';
 import { useState } from 'react';
 
@@ -18,10 +7,9 @@ export function WelcomeGuide({
   onComplete,
 }: {
   open: boolean;
-  onComplete: (includeExamples: boolean) => Promise<void>;
+  onComplete: () => Promise<void>;
 }) {
   const [step, setStep] = useState(0);
-  const [includeExamples, setIncludeExamples] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const pages = [
@@ -37,8 +25,8 @@ export function WelcomeGuide({
     },
     {
       icon: <Database size={28} />,
-      title: '从自己的手册开始',
-      body: '你可以加载少量示例来熟悉界面，也可以从完全空白的手册开始。之后可随时在设置中导出备份。',
+      title: '从空白手册开始',
+      body: '初始化后不会添加任何示例内容。你可以从第一道菜、第一份资料或第一个待办开始记录。',
     },
   ];
   const page = pages[step];
@@ -46,7 +34,7 @@ export function WelcomeGuide({
     setSaving(true);
     setError('');
     try {
-      await onComplete(includeExamples);
+      await onComplete();
     } catch {
       setError('初始化失败，请检查浏览器存储空间后重试。');
     } finally {
@@ -79,16 +67,6 @@ export function WelcomeGuide({
             {page.body}
           </Text>
         </Stack>
-        {step === 2 && (
-          <Paper withBorder radius="lg" p="md">
-            <Checkbox
-              checked={includeExamples}
-              onChange={(event) => setIncludeExamples(event.currentTarget.checked)}
-              label="加载示例菜谱、资料和待办"
-              description="示例内容可以像普通记录一样编辑或删除"
-            />
-          </Paper>
-        )}
         {error && (
           <Text c="red" size="sm" role="alert">
             {error}

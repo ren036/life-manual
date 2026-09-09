@@ -1,6 +1,5 @@
 import { attachmentIds, recordAttachments } from '../attachments';
 import { isTrashExpired } from '../dataSafety';
-import { seedDocuments, seedRecipes, seedTasks } from '../data/seed';
 import type {
   AppData,
   AddMode,
@@ -14,7 +13,7 @@ import type {
 } from '../types';
 
 const DATABASE_NAME = 'life-manual';
-const DATABASE_VERSION = 5;
+const DATABASE_VERSION = 6;
 const RECORDS_STORE = 'records';
 const ATTACHMENTS_STORE = 'attachments';
 const RECIPES_STORE = 'recipes';
@@ -24,6 +23,11 @@ const NOTES_STORE = 'notes';
 const SETTINGS_STORE = 'settings';
 const CURRENT_BACKUP_VERSION = 4;
 const PRE_IMPORT_BACKUP_KEY = 'pre-import-backup';
+const DEPRECATED_SEED_IDS = {
+  recipes: ['egg-tomato', 'pepper-egg', 'potato-chicken'],
+  documents: ['socket', 'invoice'],
+  tasks: ['task-backup', 'task-shopping'],
+} as const;
 
 export type ImportMode = 'merge' | 'replace';
 
@@ -77,6 +81,16 @@ function openDatabase(): Promise<IDBDatabase> {
         database.createObjectStore(NOTES_STORE, { keyPath: 'id' });
       if (!database.objectStoreNames.contains(SETTINGS_STORE))
         database.createObjectStore(SETTINGS_STORE);
+      if ((event as IDBVersionChangeEvent).oldVersion > 0) {
+        const transaction = request.transaction;
+        DEPRECATED_SEED_IDS.recipes.forEach((id) =>
+          transaction?.objectStore(RECIPES_STORE).delete(id),
+        );
+        DEPRECATED_SEED_IDS.documents.forEach((id) =>
+          transaction?.objectStore(DOCUMENTS_STORE).delete(id),
+        );
+        DEPRECATED_SEED_IDS.tasks.forEach((id) => transaction?.objectStore(TASKS_STORE).delete(id));
+      }
       if ((event as IDBVersionChangeEvent).oldVersion > 0)
         request.transaction?.objectStore(SETTINGS_STORE).put(true, 'initialized');
     };
@@ -124,7 +138,7 @@ function toDocument(record: LegacyRecord): DocumentItem {
   };
 }
 
-export async function loadAppData(includeSeedData = true): Promise<AppData> {
+export async function loadAppData(): Promise<AppData> {
   const database = await openDatabase();
   await purgeExpiredTrash(database);
   let [recipes, documents, tasks, notes, initialized] = await Promise.all([
@@ -148,25 +162,11 @@ export async function loadAppData(includeSeedData = true): Promise<AppData> {
     const legacy = (await requestResult(
       database.transaction(RECORDS_STORE).objectStore(RECORDS_STORE).getAll(),
     )) as LegacyRecord[];
-    recipes = legacy.length
-      ? legacy.filter((item) => item.kind === '菜品').map(toRecipe)
-      : includeSeedData
-        ? [...seedRecipes]
-        : [];
-    documents = legacy.length
-      ? legacy.filter((item) => item.kind !== '菜品').map(toDocument)
-      : includeSeedData
-        ? [...seedDocuments]
-        : [];
+    recipes = legacy.length ? legacy.filter((item) => item.kind === '菜品').map(toRecipe) : [];
+    documents = legacy.length ? legacy.filter((item) => item.kind !== '菜品').map(toDocument) : [];
     const transaction = database.transaction([RECIPES_STORE, DOCUMENTS_STORE], 'readwrite');
     recipes.forEach((item) => transaction.objectStore(RECIPES_STORE).put(item));
     documents.forEach((item) => transaction.objectStore(DOCUMENTS_STORE).put(item));
-    await complete(transaction);
-  }
-  if (!initialized && !tasks.length) {
-    tasks = includeSeedData ? [...seedTasks] : [];
-    const transaction = database.transaction(TASKS_STORE, 'readwrite');
-    tasks.forEach((item) => transaction.objectStore(TASKS_STORE).put(item));
     await complete(transaction);
   }
   if (!initialized) {
@@ -421,6 +421,21 @@ export async function permanentlyDeleteTrashEntry(entry: TrashEntry): Promise<vo
 export async function emptyTrash(): Promise<void> {
   const database = await openDatabase();
   await permanentlyDeleteEntries(database, await readTrash(database));
+}
+
+export async function clearAllData(): Promise<void> {
+  const database = await openDatabase();
+  const stores = [
+    RECORDS_STORE,
+    ATTACHMENTS_STORE,
+    RECIPES_STORE,
+    DOCUMENTS_STORE,
+    TASKS_STORE,
+    NOTES_STORE,
+  ];
+  const transaction = database.transaction(stores, 'readwrite');
+  stores.forEach((store) => transaction.objectStore(store).clear());
+  await complete(transaction);
 }
 
 function blobToBase64(blob: Blob): Promise<string> {
