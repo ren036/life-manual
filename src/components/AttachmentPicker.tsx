@@ -97,7 +97,7 @@ export function AttachmentPicker({
           {files.map((attachment, index) => (
             <Paper withBorder radius="md" p="xs" pos="relative" key={attachment.id}>
               <Stack gap={5}>
-                <AspectRatio ratio={1} bg="gray.0">
+                <AspectRatio ratio={1} bg="var(--mantine-color-default-hover)">
                   {attachment.type.startsWith('image/') ? (
                     attachment.file ? (
                       <LocalPreview file={attachment.file} />

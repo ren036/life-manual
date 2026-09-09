@@ -69,7 +69,7 @@ function ResultButton({
       component="button"
       type="button"
       bd="none"
-      bg="white"
+      bg="var(--app-surface)"
       shadow="xs"
       radius="xl"
       p="md"
@@ -165,7 +165,7 @@ export function HomePage({
         </Button>
       </Paper>
       {backupOverdue && (
-        <Paper radius="xl" p="md" bg="yellow.0" withBorder>
+        <Paper radius="xl" p="md" bg="var(--mantine-color-yellow-light)" withBorder>
           <Group wrap="nowrap" justify="space-between">
             <Group wrap="nowrap">
               <ThemeIcon color="yellow" variant="light" radius="xl">
@@ -187,7 +187,7 @@ export function HomePage({
         </Paper>
       )}
       {(dueTasks.length > 0 || expiringDocuments.length > 0) && (
-        <Paper radius="xl" p="md" bg="orange.0" withBorder>
+        <Paper radius="xl" p="md" bg="var(--mantine-color-orange-light)" withBorder>
           <Group gap="xs" mb="sm">
             <AlertTriangle size={18} color="var(--mantine-color-orange-7)" />
             <Text fw={700} c="orange.9">
@@ -264,7 +264,13 @@ export function HomePage({
         </Stack>
       ) : (
         <>
-          <Paper bg="white" radius="lg" withBorder shadow="xs" style={{ overflow: 'hidden' }}>
+          <Paper
+            bg="var(--app-surface)"
+            radius="lg"
+            withBorder
+            shadow="xs"
+            style={{ overflow: 'hidden' }}
+          >
             <SimpleGrid cols={3} spacing={0}>
               {[
                 { mode: 'recipes' as const, icon: Utensils, title: '菜谱' },
@@ -311,7 +317,7 @@ export function HomePage({
                   component="button"
                   type="button"
                   bd="none"
-                  bg="white"
+                  bg="var(--app-surface)"
                   shadow="xs"
                   radius="lg"
                   withBorder
@@ -320,13 +326,16 @@ export function HomePage({
                   key={item.id}
                   onClick={() => onOpenRecipe(item)}
                 >
-                  <AspectRatio ratio={16 / 9} bg={index % 2 ? '#eee8dd' : '#e8ede7'}>
+                  <AspectRatio
+                    ratio={16 / 9}
+                    bg={index % 2 ? 'var(--app-cover-warm)' : 'var(--app-cover-green)'}
+                  >
                     {cover.available ? (
                       <AttachmentPreview id={cover.id} enabled alt={item.title} />
                     ) : (
                       <Center>
                         <Text
-                          c="rgba(29, 72, 53, 0.68)"
+                          c="var(--app-cover-mark)"
                           ff="'Songti SC', STSong, SimSun, serif"
                           fz={42}
                           lh={1}
@@ -373,7 +382,7 @@ export function HomePage({
                 component="button"
                 type="button"
                 bd="none"
-                bg="white"
+                bg="var(--app-surface)"
                 shadow="xs"
                 radius="lg"
                 withBorder

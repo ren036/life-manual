@@ -234,7 +234,12 @@ export function NoteSheet({
           语音转文字的可用性取决于浏览器；录音和随记会保存在本机，并随备份一起导出。
         </Text>
         {audio && (
-          <Group justify="space-between" p="sm" bg="blue.0" style={{ borderRadius: 12 }}>
+          <Group
+            justify="space-between"
+            p="sm"
+            bg="var(--mantine-color-blue-light)"
+            style={{ borderRadius: 12 }}
+          >
             <Text size="sm">已录好一段语音</Text>
             <Button
               size="compact-xs"

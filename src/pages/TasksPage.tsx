@@ -116,7 +116,7 @@ export function TasksPage({
         {shown.map((item) => (
           <Paper
             component="article"
-            bg="white"
+            bg="var(--app-surface)"
             shadow="xs"
             radius="lg"
             withBorder
@@ -218,7 +218,7 @@ export function TasksPage({
       </Stack>
 
       {!shown.length && (
-        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
+        <Paper bg="var(--app-surface)" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
             <Text c="dimmed">这里暂时是空的。</Text>
             {!tasks.length && <Button onClick={onAdd}>新建第一个待办</Button>}

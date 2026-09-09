@@ -125,7 +125,7 @@ export function DocumentsPage({
             radius="lg"
             withBorder
             p="sm"
-            bg="white"
+            bg="var(--app-surface)"
             ta="left"
             key={item.id}
             onClick={() => onOpen(item)}
@@ -135,7 +135,7 @@ export function DocumentsPage({
                 w={62}
                 h={62}
                 radius="md"
-                bg="green.0"
+                bg="var(--mantine-color-green-light)"
                 withBorder
                 style={{ overflow: 'hidden' }}
               >
@@ -188,7 +188,7 @@ export function DocumentsPage({
         ))}
       </Stack>
       {!shown.length && (
-        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
+        <Paper bg="var(--app-surface)" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
             <Text c="dimmed">{documents.length ? '这个分类还没有资料。' : '还没有保存资料。'}</Text>
             {!documents.length && <Button onClick={onAdd}>上传第一份资料</Button>}

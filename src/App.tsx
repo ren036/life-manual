@@ -9,10 +9,12 @@ import {
   Text,
   ThemeIcon,
   Title,
+  useComputedColorScheme,
+  useMantineColorScheme,
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { notifications } from '@mantine/notifications';
-import { ArrowLeft, Pencil, Settings, Trash2 } from 'lucide-react';
+import { ArrowLeft, Moon, Pencil, Settings, Sun, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AddRecordSheet } from './components/AddRecordSheet';
 import { BottomNav } from './components/BottomNav';
@@ -117,6 +119,9 @@ function readRoute(): { tab: AppTab; id?: string } {
 }
 
 export default function App() {
+  const { setColorScheme } = useMantineColorScheme();
+  const colorScheme = useComputedColorScheme('light');
+  const dark = colorScheme === 'dark';
   const [route, setRoute] = useState(readRoute);
   const tab = route.tab;
   const setTab = (next: AppTab) => {
@@ -853,10 +858,10 @@ export default function App() {
   }));
   const stickyTop = !online ? 38 : 0;
   return (
-    <Box component="main" bg="#efeee9" mih="100vh">
-      <Paper w="100%" maw={480} mx="auto" mih="100vh" radius={0} shadow="xl" bg="#f7f6f2">
+    <Box component="main" bg="var(--app-frame)" mih="100vh">
+      <Paper w="100%" maw={480} mx="auto" mih="100vh" radius={0} shadow="xl" bg="var(--app-bg)">
         {!online && (
-          <Paper radius={0} p="xs" bg="orange.1">
+          <Paper radius={0} p="xs" bg="var(--mantine-color-orange-light)">
             <Text ta="center" size="xs" c="orange.9">
               当前离线，仍可查看和编辑本机记录
             </Text>
@@ -868,7 +873,7 @@ export default function App() {
           top={stickyTop}
           px="md"
           py={10}
-          bg="rgba(247, 246, 242, 0.94)"
+          bg="var(--app-header)"
           style={{ zIndex: 20 }}
         >
           <Group justify="space-between" wrap="nowrap" mih={44}>
@@ -885,7 +890,7 @@ export default function App() {
                 </ActionIcon>
               )}
               <Stack gap={1}>
-                <Text c="green.7" size="xs" fw={700}>
+                <Text c={dark ? 'green.3' : 'green.7'} size="xs" fw={700}>
                   {route.id
                     ? pageTitles[tab]
                     : tab === 'home'
@@ -927,15 +932,31 @@ export default function App() {
                 )}
               </Group>
             ) : (
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                size={36}
-                onClick={() => setSettingsOpen(true)}
-                aria-label="打开设置"
-              >
-                <Settings size={19} />
-              </ActionIcon>
+              <Group gap={2} wrap="nowrap">
+                <ActionIcon
+                  variant="subtle"
+                  color={dark ? 'yellow' : 'gray'}
+                  size={36}
+                  onClick={() => setColorScheme(dark ? 'light' : 'dark')}
+                  aria-label={dark ? '开灯' : '关灯'}
+                  title={dark ? '开灯' : '关灯'}
+                >
+                  {dark ? (
+                    <Sun key="sun" className="theme-toggle-icon" size={19} />
+                  ) : (
+                    <Moon key="moon" className="theme-toggle-icon" size={19} />
+                  )}
+                </ActionIcon>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size={36}
+                  onClick={() => setSettingsOpen(true)}
+                  aria-label="打开设置"
+                >
+                  <Settings size={19} />
+                </ActionIcon>
+              </Group>
             )}
           </Group>
         </Box>

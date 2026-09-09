@@ -7,6 +7,7 @@ import App from './App';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import './styles.css';
+import './theme.css';
 
 const theme = createTheme({
   primaryColor: 'green',
@@ -43,7 +44,7 @@ const theme = createTheme({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider theme={theme}>
+    <MantineProvider theme={theme} defaultColorScheme="light">
       <ModalsProvider labels={{ confirm: '确认', cancel: '取消' }}>
         <Notifications position="bottom-center" limit={3} />
         <App />

@@ -183,7 +183,7 @@ export function RecipesPage({
                 radius="lg"
                 withBorder
                 p={0}
-                bg="white"
+                bg="var(--app-surface)"
                 ta="left"
                 pos="relative"
                 key={item.id}
@@ -194,14 +194,17 @@ export function RecipesPage({
                   outline: selected ? '2px solid var(--mantine-color-green-6)' : undefined,
                 }}
               >
-                <AspectRatio ratio={4 / 3} bg={index % 2 ? '#eee8dc' : '#e7ede8'}>
+                <AspectRatio
+                  ratio={4 / 3}
+                  bg={index % 2 ? 'var(--app-cover-warm)' : 'var(--app-cover-green)'}
+                >
                   <Box w="100%" h="100%">
                     {cover.available ? (
                       <AttachmentPreview id={cover.id} enabled alt={item.title} />
                     ) : (
                       <Center w="100%" h="100%">
                         <Text
-                          c="rgba(29, 72, 53, 0.65)"
+                          c="var(--app-cover-mark)"
                           ff="'Songti SC', STSong, SimSun, serif"
                           fz={40}
                           lh={1}
@@ -258,7 +261,7 @@ export function RecipesPage({
           })}
         </SimpleGrid>
       ) : (
-        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
+        <Paper bg="var(--app-surface)" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
             <Text c="dimmed">{recipes.length ? '还没有符合条件的菜。' : '还没有记录菜谱。'}</Text>
             {!recipes.length && <Button onClick={onAdd}>添加第一道菜</Button>}
@@ -324,7 +327,7 @@ export function RecipesPage({
               ))}
             </Stack>
           ) : (
-            <Paper bg="gray.0" radius="lg" p="lg" ta="center">
+            <Paper bg="var(--app-surface)" radius="lg" p="lg" ta="center">
               <Text c="dimmed">所选菜谱还没有填写食材。</Text>
             </Paper>
           )}

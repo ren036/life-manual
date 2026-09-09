@@ -103,7 +103,7 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <Paper component="section" radius="xl" p="lg" bg="white" shadow="xs">
+    <Paper component="section" radius="xl" p="lg" bg="var(--app-surface)" shadow="xs">
       <Group justify="space-between" mb="md">
         <Title order={3}>{title}</Title>
         {aside && (

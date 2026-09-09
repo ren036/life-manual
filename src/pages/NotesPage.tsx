@@ -59,7 +59,7 @@ export function NotesPage({
 
   return (
     <Stack gap="lg">
-      <Paper radius={28} p="xl" bg="grape.7" c="white" shadow="md">
+      <Paper radius={28} p="xl" bg="var(--app-notes-hero)" c="white" shadow="md">
         <Text size="xs" opacity={0.78}>
           随记
         </Text>
@@ -84,7 +84,7 @@ export function NotesPage({
         {shown.map((note) => (
           <Paper
             component="article"
-            bg="#fffdf9"
+            bg="var(--app-surface-soft)"
             shadow="xs"
             radius="lg"
             withBorder
@@ -148,7 +148,7 @@ export function NotesPage({
       </Stack>
 
       {!shown.length && (
-        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
+        <Paper bg="var(--app-surface)" radius="lg" p="xl" ta="center" withBorder>
           <Text c="dimmed" mb="md">
             {notes.length ? '这个心情下还没有随记。' : '还没有随记，今天感觉怎么样？'}
           </Text>

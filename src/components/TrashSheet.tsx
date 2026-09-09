@@ -85,7 +85,7 @@ export function TrashSheet({
           </Paper>
         ))}
         {!entries.length && (
-          <Paper bg="gray.0" radius="lg" p="xl" ta="center">
+          <Paper bg="var(--mantine-color-default-hover)" radius="lg" p="xl" ta="center">
             <Text c="dimmed">回收站是空的。</Text>
           </Paper>
         )}

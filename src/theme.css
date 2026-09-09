@@ -1,0 +1,81 @@
+:root {
+  color-scheme: light dark;
+}
+
+:root[data-mantine-color-scheme='light'] {
+  --app-frame: #efeee9;
+  --app-bg: #f7f6f2;
+  --app-header: rgba(247, 246, 242, 0.94);
+  --app-surface: #ffffff;
+  --app-surface-soft: #fffdf9;
+  --app-notes-hero: #665066;
+  --app-cover-green: #e7ede8;
+  --app-cover-warm: #eee8dc;
+  --app-cover-mark: rgba(29, 72, 53, 0.66);
+}
+
+:root[data-mantine-color-scheme='dark'] {
+  --app-frame: #0d100e;
+  --app-bg: #151916;
+  --app-header: rgba(21, 25, 22, 0.94);
+  --app-surface: #1d231f;
+  --app-surface-soft: #211f20;
+  --app-notes-hero: #5d465f;
+  --app-cover-green: #26362e;
+  --app-cover-warm: #393126;
+  --app-cover-mark: rgba(205, 226, 214, 0.7);
+}
+
+:root,
+body {
+  background: var(--app-bg);
+}
+
+button {
+  color: inherit;
+}
+
+body {
+  transition:
+    color 220ms ease,
+    background-color 260ms ease;
+}
+
+.mantine-Paper-root,
+.mantine-Input-input,
+.mantine-Drawer-content,
+.mantine-Modal-content {
+  transition:
+    color 220ms ease,
+    border-color 220ms ease,
+    background-color 260ms ease;
+}
+
+.theme-toggle-icon {
+  animation: theme-toggle-pop 260ms ease-out;
+}
+
+@keyframes theme-toggle-pop {
+  from {
+    opacity: 0;
+    transform: rotate(-35deg) scale(0.65);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  .mantine-Paper-root,
+  .mantine-Input-input,
+  .mantine-Drawer-content,
+  .mantine-Modal-content {
+    transition: none;
+  }
+
+  .theme-toggle-icon {
+    animation: none;
+  }
+}

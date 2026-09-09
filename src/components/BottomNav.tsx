@@ -42,7 +42,7 @@ export function BottomNav({
         pb="calc(6px + env(safe-area-inset-bottom))"
         radius={0}
         shadow="lg"
-        bg="white"
+        bg="var(--app-surface)"
         withBorder
       >
         {onAdd && (
