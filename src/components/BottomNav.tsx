@@ -51,7 +51,7 @@ export function BottomNav({
             top={-62}
             right={24}
             size={52}
-            color="green"
+            color={active === 'notes' ? 'grape' : 'green'}
             variant="filled"
             onClick={onAdd}
             aria-label="新增"
