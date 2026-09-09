@@ -18,11 +18,7 @@ import {
 import { Check, Clipboard, Search, ShoppingCart, Star, Utensils, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AttachmentPreview } from '../components/AttachmentPreview';
-import {
-  buildShoppingList,
-  shoppingAmountLabel,
-  shoppingListText,
-} from '../shoppingList';
+import { buildShoppingList, shoppingAmountLabel, shoppingListText } from '../shoppingList';
 import type { Recipe } from '../types';
 type SortMode = '最近添加' | '名称排序';
 
@@ -73,9 +69,9 @@ export function RecipesPage({
           (item) =>
             (filter === 'all' || filter.startsWith('special:')
               ? filter === 'all' ||
-              (filter === 'special:favorite' && !!item.favorite) ||
-              (filter === 'special:cooked' && !!item.cookingRecords?.length) ||
-              (filter === 'special:uncooked' && !item.cookingRecords?.length)
+                (filter === 'special:favorite' && !!item.favorite) ||
+                (filter === 'special:cooked' && !!item.cookingRecords?.length) ||
+                (filter === 'special:uncooked' && !item.cookingRecords?.length)
               : filter.startsWith('tag:')
                 ? item.tags?.includes(filter.slice(4))
                 : item.category === filter.slice(9)) &&
@@ -121,29 +117,27 @@ export function RecipesPage({
 
   return (
     <Stack gap="md">
-      <Group wrap="nowrap" align="stretch">
+      <Group wrap="nowrap" align="stretch" gap="sm">
         <TextInput
           flex={1}
-          leftSection={<Search size={17} />}
+          aria-label="搜索菜谱"
+          leftSection={<Search size={18} strokeWidth={1.8} color="var(--mantine-color-green-8)" />}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
-          placeholder="搜菜名、食材或标签"
-          radius="md"
+          placeholder="搜索菜名、食材或标签"
           rightSection={
-            query ? (
-              <Input.ClearButton
-                aria-label="Clear input"
-                onClick={() => setQuery('')}
-              />
-            ) : null
+            query ? <Input.ClearButton aria-label="清除搜索" onClick={() => setQuery('')} /> : null
           }
         />
         <Select
-          w={110}
+          w={92}
           aria-label="菜谱排序"
           value={sort}
           onChange={(value) => setSort((value || '最近添加') as SortMode)}
-          data={['最近添加', '名称排序']}
+          data={[
+            { value: '最近添加', label: '最新' },
+            { value: '名称排序', label: '名称' },
+          ]}
           allowDeselect={false}
           radius="md"
         />
@@ -166,8 +160,9 @@ export function RecipesPage({
           <Button
             key={item.value}
             size="compact-sm"
-            radius="xl"
-            variant={filter === item.value ? 'filled' : 'light'}
+            radius="md"
+            color={filter === item.value ? 'green' : 'gray'}
+            variant={filter === item.value ? 'filled' : 'subtle'}
             onClick={() => setFilter(item.value)}
           >
             {item.label}
@@ -176,7 +171,7 @@ export function RecipesPage({
       </Group>
       {shown.length ? (
         <SimpleGrid cols={2} spacing="sm">
-          {shown.map((item) => {
+          {shown.map((item, index) => {
             const cover = recipeCover(item);
             const selected = selectedIds.includes(item.id);
             return (
@@ -186,6 +181,7 @@ export function RecipesPage({
                 bd="none"
                 shadow="xs"
                 radius="lg"
+                withBorder
                 p={0}
                 bg="white"
                 ta="left"
@@ -193,17 +189,25 @@ export function RecipesPage({
                 key={item.id}
                 onClick={() => chooseRecipe(item)}
                 aria-pressed={selecting ? selected : undefined}
-                style={selected ? { outline: '2px solid var(--mantine-color-green-6)' } : undefined}
+                style={{
+                  overflow: 'hidden',
+                  outline: selected ? '2px solid var(--mantine-color-green-6)' : undefined,
+                }}
               >
-                <AspectRatio ratio={4 / 3} bg="green.0">
+                <AspectRatio ratio={4 / 3} bg={index % 2 ? '#eee8dc' : '#e7ede8'}>
                   <Box w="100%" h="100%">
                     {cover.available ? (
                       <AttachmentPreview id={cover.id} enabled alt={item.title} />
                     ) : (
                       <Center w="100%" h="100%">
-                        <ThemeIcon size="xl" radius="xl" variant="light">
-                          <Utensils />
-                        </ThemeIcon>
+                        <Text
+                          c="rgba(29, 72, 53, 0.65)"
+                          ff="'Songti SC', STSong, SimSun, serif"
+                          fz={40}
+                          lh={1}
+                        >
+                          {item.title.slice(0, 1)}
+                        </Text>
                       </Center>
                     )}
                   </Box>
@@ -254,7 +258,7 @@ export function RecipesPage({
           })}
         </SimpleGrid>
       ) : (
-        <Paper bg="white" radius="xl" p="xl" ta="center">
+        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
             <Text c="dimmed">{recipes.length ? '还没有符合条件的菜。' : '还没有记录菜谱。'}</Text>
             {!recipes.length && <Button onClick={onAdd}>添加第一道菜</Button>}

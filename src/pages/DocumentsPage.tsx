@@ -75,29 +75,28 @@ export function DocumentsPage({
   );
   return (
     <Stack gap="md">
-      <Group wrap="nowrap" align="stretch">
+      <Group wrap="nowrap" align="stretch" gap="sm">
         <TextInput
           flex={1}
-          leftSection={<Search size={17} />}
+          aria-label="搜索资料"
+          leftSection={<Search size={18} strokeWidth={1.8} color="var(--mantine-color-green-8)" />}
           value={query}
           onChange={(e) => setQuery(e.currentTarget.value)}
-          placeholder="搜索资料或标签"
-          radius="md"
+          placeholder="搜索资料与标签"
           rightSection={
-                    query ? (
-                      <Input.ClearButton
-                        aria-label="Clear input"
-                        onClick={() => setQuery('')}
-                      />
-                    ) : null
-                  }
+            query ? <Input.ClearButton aria-label="清除搜索" onClick={() => setQuery('')} /> : null
+          }
         />
         <Select
-          w={110}
+          w={92}
           aria-label="资料排序"
           value={sort}
           onChange={(value) => setSort((value || '最近添加') as SortMode)}
-          data={['最近添加', '名称排序', '到期优先']}
+          data={[
+            { value: '最近添加', label: '最新' },
+            { value: '名称排序', label: '名称' },
+            { value: '到期优先', label: '到期' },
+          ]}
           allowDeselect={false}
           radius="md"
         />
@@ -107,8 +106,9 @@ export function DocumentsPage({
           <Button
             key={item.value}
             size="compact-sm"
-            radius="lg"
-            variant={filter === item.value ? 'filled' : 'light'}
+            radius="md"
+            color={filter === item.value ? 'green' : 'gray'}
+            variant={filter === item.value ? 'filled' : 'subtle'}
             onClick={() => setFilter(item.value)}
           >
             {item.label}
@@ -123,6 +123,7 @@ export function DocumentsPage({
             bd="none"
             shadow="xs"
             radius="lg"
+            withBorder
             p="sm"
             bg="white"
             ta="left"
@@ -130,7 +131,14 @@ export function DocumentsPage({
             onClick={() => onOpen(item)}
           >
             <Group wrap="nowrap">
-              <Paper w={62} h={62} radius="md" bg="green.0">
+              <Paper
+                w={62}
+                h={62}
+                radius="md"
+                bg="green.0"
+                withBorder
+                style={{ overflow: 'hidden' }}
+              >
                 {item.hasFile && item.isImage ? (
                   <AttachmentPreview
                     id={item.attachments?.[0]?.id || item.id}
@@ -180,7 +188,7 @@ export function DocumentsPage({
         ))}
       </Stack>
       {!shown.length && (
-        <Paper bg="white" radius="xl" p="xl" ta="center">
+        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
             <Text c="dimmed">{documents.length ? '这个分类还没有资料。' : '还没有保存资料。'}</Text>
             {!documents.length && <Button onClick={onAdd}>上传第一份资料</Button>}

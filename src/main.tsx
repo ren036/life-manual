@@ -54,6 +54,9 @@ createRoot(document.getElementById('root')!).render(
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    void navigator.serviceWorker.register('/service-worker.js');
+    void navigator.serviceWorker.register(
+      `/service-worker.js?v=${encodeURIComponent(__DEPLOYED_AT__)}`,
+      { updateViaCache: 'none' },
+    );
   });
 }

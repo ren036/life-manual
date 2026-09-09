@@ -63,6 +63,7 @@ export function WelcomeGuide({
       closeOnEscape={false}
       title={null}
       radius="xl"
+      size="min(440px, calc(100vw - 24px))"
     >
       <Stack gap="lg" p="xs">
         <Progress value={((step + 1) / pages.length) * 100} size="xs" />

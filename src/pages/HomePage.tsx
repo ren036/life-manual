@@ -1,6 +1,9 @@
 import {
+  AspectRatio,
   Badge,
+  Box,
   Button,
+  Center,
   CloseButton,
   Group,
   Input,
@@ -11,6 +14,7 @@ import {
   TextInput,
   ThemeIcon,
   Title,
+  UnstyledButton,
 } from '@mantine/core';
 import {
   AlertTriangle,
@@ -25,6 +29,7 @@ import {
   Utensils,
 } from 'lucide-react';
 import { ReactNode, useMemo, useState } from 'react';
+import { AttachmentPreview } from '../components/AttachmentPreview';
 import { daysFromDate, dueLabel } from '../dueDates';
 import type { AddMode, AppTab, DocumentItem, Recipe, TaskItem } from '../types';
 interface Props {
@@ -37,6 +42,16 @@ interface Props {
   onOpenDocument: (item: DocumentItem) => void;
   backupOverdue: boolean;
   onBackup: () => void;
+}
+
+function recipeCover(item: Recipe) {
+  const latestPhoto = [...(item.cookingRecords || [])]
+    .sort((a, b) => b.createdAt - a.createdAt)[0]
+    ?.attachments.find((attachment) => attachment.type.startsWith('image/'));
+  return {
+    id: latestPhoto?.id || item.attachments?.[0]?.id || item.id,
+    available: !!latestPhoto || !!item.hasFile,
+  };
 }
 function ResultButton({
   icon,
@@ -133,12 +148,12 @@ export function HomePage({
   );
   return (
     <Stack gap="lg">
-      <Paper radius="xl" p="lg" bg="green.8" c="white" mih={142}>
+      <Paper radius={28} p="lg" bg="green.8" c="white" mih={142} shadow="md">
         <Text size="xs" opacity={0.8}>
-          今天也慢慢来
+          今日待办
         </Text>
         <Title order={2} size="h2" mt={6} mb="lg" lh={1.25}>
-          {pending.length ? `还有 ${pending.length} 件事等你处理` : '今天的事情都完成了'}
+          {pending.length ? `${pending.length} 件事待完成` : '今天没有未完成事项'}
         </Title>
         <Button
           variant="white"
@@ -202,18 +217,14 @@ export function HomePage({
         </Paper>
       )}
       <TextInput
-        leftSection={<Search size={17} />}
+        aria-label="搜索全部内容"
+        leftSection={<Search size={18} strokeWidth={1.8} color="var(--mantine-color-green-8)" />}
         value={query}
         onChange={(event) => setQuery(event.currentTarget.value)}
-        placeholder="搜索菜谱、资料或待办"
+        placeholder="搜索全部内容"
         size="lg"
         rightSection={
-          query ? (
-            <Input.ClearButton
-              aria-label="Clear input"
-              onClick={() => setQuery('')}
-            />
-          ) : null
+          query ? <Input.ClearButton aria-label="清除搜索" onClick={() => setQuery('')} /> : null
         }
       />
       {results ? (
@@ -253,86 +264,89 @@ export function HomePage({
         </Stack>
       ) : (
         <>
-          <SimpleGrid cols={3} spacing="sm">
-            {[
-              {
-                mode: 'recipes' as const,
-                icon: <Utensils />,
-                title: '记一道菜',
-                detail: '味道和照片',
-              },
-              {
-                mode: 'documents' as const,
-                icon: <FileUp />,
-                title: '存份资料',
-                detail: '图片或文件',
-              },
-              {
-                mode: 'tasks' as const,
-                icon: <CheckSquare />,
-                title: '加个待办',
-                detail: '别让事情溜走',
-              },
-            ].map((action) => (
-              <Paper
-                component="button"
-                type="button"
-                bd="none"
-                bg="white"
-                shadow="xs"
-                radius="xl"
-                px="xs"
-                py="md"
-                ta="center"
-                mih={94}
-                key={action.mode}
-                onClick={() => onAdd(action.mode)}
-              >
-                <ThemeIcon variant="light" radius="xl" size={40} mb="xs">
-                  {action.icon}
-                </ThemeIcon>
-                <Text fw={700} size="sm">
-                  {action.title}
-                </Text>
-                <Text c="dimmed" size="xs">
-                  {action.detail}
-                </Text>
-              </Paper>
-            ))}
-          </SimpleGrid>
+          <Paper bg="white" radius="lg" withBorder shadow="xs" style={{ overflow: 'hidden' }}>
+            <SimpleGrid cols={3} spacing={0}>
+              {[
+                { mode: 'recipes' as const, icon: Utensils, title: '菜谱' },
+                { mode: 'documents' as const, icon: FileUp, title: '资料' },
+                { mode: 'tasks' as const, icon: CheckSquare, title: '待办' },
+              ].map(({ mode, icon: Icon, title }, index) => (
+                <UnstyledButton
+                  key={mode}
+                  onClick={() => onAdd(mode)}
+                  aria-label={`新增${title}`}
+                  style={{
+                    borderRight: index < 2 ? '1px solid var(--mantine-color-gray-2)' : undefined,
+                  }}
+                >
+                  <Stack align="center" gap={6} py="md">
+                    <Icon size={21} strokeWidth={1.8} />
+                    <Text fw={650} size="sm">
+                      新建{title}
+                    </Text>
+                  </Stack>
+                </UnstyledButton>
+              ))}
+            </SimpleGrid>
+          </Paper>
           <Group justify="space-between">
             <Title order={3} size="h4">
               最近做过
             </Title>
-            <Button variant="subtle" size="compact-sm" onClick={() => onNavigate('recipes')}>
+            <Button
+              color="gray"
+              fw={600}
+              variant="subtle"
+              size="compact-sm"
+              onClick={() => onNavigate('recipes')}
+            >
               全部菜谱
             </Button>
           </Group>
           <SimpleGrid cols={2} spacing="sm">
-            {recipes.slice(0, 2).map((item) => (
-              <Paper
-                component="button"
-                type="button"
-                bd="none"
-                bg="white"
-                shadow="xs"
-                radius="xl"
-                p="lg"
-                mih={112}
-                key={item.id}
-                onClick={() => onOpenRecipe(item)}
-              >
-                <ThemeIcon variant="light" radius="xl" size={40} mb="xs">
-                  <Utensils />
-                </ThemeIcon>
-                <Text fw={700} lineClamp={1}>
-                  {item.title}
-                </Text>
-                <Text c="dimmed" size="xs" lineClamp={1}>
-                  {item.ingredients.join(' · ') || item.category}
-                </Text>
-              </Paper>
-            ))}
+            {recipes.slice(0, 2).map((item, index) => {
+              const cover = recipeCover(item);
+              return (
+                <Paper
+                  component="button"
+                  type="button"
+                  bd="none"
+                  bg="white"
+                  shadow="xs"
+                  radius="lg"
+                  withBorder
+                  p={0}
+                  style={{ overflow: 'hidden' }}
+                  key={item.id}
+                  onClick={() => onOpenRecipe(item)}
+                >
+                  <AspectRatio ratio={16 / 9} bg={index % 2 ? '#eee8dd' : '#e8ede7'}>
+                    {cover.available ? (
+                      <AttachmentPreview id={cover.id} enabled alt={item.title} />
+                    ) : (
+                      <Center>
+                        <Text
+                          c="rgba(29, 72, 53, 0.68)"
+                          ff="'Songti SC', STSong, SimSun, serif"
+                          fz={42}
+                          lh={1}
+                        >
+                          {item.title.slice(0, 1)}
+                        </Text>
+                      </Center>
+                    )}
+                  </AspectRatio>
+                  <Box p="sm" ta="left">
+                    <Text fw={700} lineClamp={1}>
+                      {item.title}
+                    </Text>
+                    <Text c="dimmed" size="xs" lineClamp={1}>
+                      {item.category} · {item.ingredients.slice(0, 2).join('、') || '暂无食材'}
+                    </Text>
+                  </Box>
+                </Paper>
+              );
+            })}
             {!recipes.length && (
               <Button variant="light" onClick={() => onAdd('recipes')}>
                 添加第一道菜
@@ -343,7 +357,13 @@ export function HomePage({
             <Title order={3} size="h4">
               最近资料
             </Title>
-            <Button variant="subtle" size="compact-sm" onClick={() => onNavigate('documents')}>
+            <Button
+              color="gray"
+              fw={600}
+              variant="subtle"
+              size="compact-sm"
+              onClick={() => onNavigate('documents')}
+            >
               打开资料库
             </Button>
           </Group>
@@ -355,13 +375,14 @@ export function HomePage({
                 bd="none"
                 bg="white"
                 shadow="xs"
-                radius="xl"
+                radius="lg"
+                withBorder
                 p="md"
                 key={item.id}
                 onClick={() => onOpenDocument(item)}
               >
                 <Group>
-                  <ThemeIcon variant="light" radius="xl">
+                  <ThemeIcon variant="light" radius="md">
                     {item.isImage ? <Camera /> : <FileUp />}
                   </ThemeIcon>
                   <Stack gap={0}>

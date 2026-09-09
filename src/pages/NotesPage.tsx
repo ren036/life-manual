@@ -59,12 +59,12 @@ export function NotesPage({
 
   return (
     <Stack gap="lg">
-      <Paper radius={28} p="xl" bg="grape.7" c="white">
+      <Paper radius={28} p="xl" bg="grape.7" c="white" shadow="md">
         <Text size="xs" opacity={0.78}>
-          你的私人角落
+          随记
         </Text>
         <Text size="xl" fw={750} mt={4}>
-          记下此刻，不必写得完整
+          今天想记下什么？
         </Text>
         <Text size="sm" opacity={0.85} mt="xs">
           {notes.length} 条随记，都只保存在你的设备里
@@ -74,7 +74,7 @@ export function NotesPage({
       <SegmentedControl
         fullWidth
         size="xs"
-        radius="xl"
+        radius="md"
         value={filter}
         onChange={(value) => setFilter(value as '全部' | Mood)}
         data={['全部', '开心', '平静', '低落', '焦虑', '生气']}
@@ -82,7 +82,15 @@ export function NotesPage({
 
       <Stack gap="md">
         {shown.map((note) => (
-          <Paper component="article" bg="white" shadow="xs" radius="xl" p="lg" key={note.id}>
+          <Paper
+            component="article"
+            bg="#fffdf9"
+            shadow="xs"
+            radius="lg"
+            withBorder
+            p="lg"
+            key={note.id}
+          >
             <Stack gap="sm">
               <Group justify="space-between" align="flex-start" wrap="nowrap">
                 <Stack gap={2} flex={1}>
@@ -140,7 +148,7 @@ export function NotesPage({
       </Stack>
 
       {!shown.length && (
-        <Paper bg="white" radius="xl" p="xl" ta="center">
+        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
           <Text c="dimmed" mb="md">
             {notes.length ? '这个心情下还没有随记。' : '还没有随记，今天感觉怎么样？'}
           </Text>

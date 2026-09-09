@@ -1,4 +1,5 @@
-const CACHE_NAME = 'life-manual-v10';
+const BUILD_VERSION = new URL(self.location.href).searchParams.get('v') || 'v11';
+const CACHE_NAME = `life-manual-${BUILD_VERSION}`;
 const APP_SHELL = ['/', '/manifest.webmanifest', '/icon.svg'];
 const DATABASE_NAME = 'life-manual';
 
@@ -143,17 +144,13 @@ self.addEventListener('fetch', (event) => {
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      caches.match(event.request).then(async (cached) => {
-        if (cached) {
-          event.waitUntil(fetchAndCache().catch(() => undefined));
-          return cached;
-        }
+      (async () => {
         try {
           return await fetchAndCache();
         } catch {
-          return caches.match('/');
+          return (await caches.match(event.request)) || caches.match('/');
         }
-      }),
+      })(),
     );
     return;
   }

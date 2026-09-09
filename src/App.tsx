@@ -853,8 +853,8 @@ export default function App() {
   }));
   const stickyTop = !online ? 38 : 0;
   return (
-    <Box component="main" bg="green.0" mih="100vh">
-      <Paper w="100%" maw={480} mx="auto" mih="100vh" radius={0} shadow="xl" bg="gray.0">
+    <Box component="main" bg="#efeee9" mih="100vh">
+      <Paper w="100%" maw={480} mx="auto" mih="100vh" radius={0} shadow="xl" bg="#f7f6f2">
         {!online && (
           <Paper radius={0} p="xs" bg="orange.1">
             <Text ta="center" size="xs" c="orange.9">
@@ -868,7 +868,7 @@ export default function App() {
           top={stickyTop}
           px="md"
           py={10}
-          bg="gray.0"
+          bg="rgba(247, 246, 242, 0.94)"
           style={{ zIndex: 20 }}
         >
           <Group justify="space-between" wrap="nowrap" mih={44}>

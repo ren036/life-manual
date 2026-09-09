@@ -70,11 +70,11 @@ export function TasksPage({
 
   return (
     <Stack gap="lg">
-      <Paper radius={28} p="xl" bg="green.8" c="white">
+      <Paper radius={28} p="xl" bg="green.8" c="white" shadow="md">
         <Group justify="space-between">
           <Stack gap={2}>
             <Text size="xs" opacity={0.78}>
-              还要做
+              待完成
             </Text>
             <Group gap={7} align="baseline">
               <Title order={2} size="h1" lh={1}>
@@ -94,7 +94,7 @@ export function TasksPage({
       <SegmentedControl
         fullWidth
         color="green"
-        radius="xl"
+        radius="md"
         size="md"
         value={view}
         onChange={(value) => setView(value as '进行中' | '已完成')}
@@ -105,7 +105,7 @@ export function TasksPage({
         <SegmentedControl
           fullWidth
           size="xs"
-          radius="xl"
+          radius="md"
           value={filter}
           onChange={(value) => setFilter(value as '全部' | '今天' | '逾期' | '紧急')}
           data={['全部', '今天', '逾期', '紧急']}
@@ -114,7 +114,15 @@ export function TasksPage({
 
       <Stack gap="md">
         {shown.map((item) => (
-          <Paper component="article" bg="white" shadow="xs" radius="xl" p="lg" key={item.id}>
+          <Paper
+            component="article"
+            bg="white"
+            shadow="xs"
+            radius="lg"
+            withBorder
+            p="lg"
+            key={item.id}
+          >
             <Group wrap="nowrap" align="flex-start">
               <ActionIcon
                 variant={item.completed ? 'filled' : 'light'}
@@ -210,7 +218,7 @@ export function TasksPage({
       </Stack>
 
       {!shown.length && (
-        <Paper bg="white" radius="xl" p="xl" ta="center">
+        <Paper bg="white" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
             <Text c="dimmed">这里暂时是空的。</Text>
             {!tasks.length && <Button onClick={onAdd}>新建第一个待办</Button>}
