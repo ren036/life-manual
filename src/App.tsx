@@ -213,6 +213,7 @@ export default function App() {
       });
     });
   }, []);
+  
   useEffect(() => {
     if (onboardingOpen) {
       setLoading(false);
