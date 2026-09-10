@@ -33,6 +33,7 @@ import { RecordDetailPage } from './pages/RecordDetailPage';
 import { TasksPage } from './pages/TasksPage';
 import { nextTaskDueDate } from './recurrence';
 import { relatedRecordKey } from './relatedRecords';
+import { onAppUpdateAvailable } from './serviceWorker';
 import {
   advanceTask,
   bulkUpdateItems,
@@ -192,6 +193,26 @@ export default function App() {
     setNotes(data.notes);
     setTrashItems(trash);
   };
+  useEffect(() => {
+    return onAppUpdateAvailable((applyUpdate) => {
+      notifications.show({
+        id: 'app-update-available',
+        message: (
+          <Group justify="space-between" wrap="nowrap">
+            <Text size="sm">发现新版本，点击刷新</Text>
+            <Button size="compact-sm" onClick={applyUpdate}>
+              刷新
+            </Button>
+          </Group>
+        ),
+        color: 'green',
+        radius: 'lg',
+        withBorder: true,
+        withCloseButton: false,
+        autoClose: false,
+      });
+    });
+  }, []);
   useEffect(() => {
     if (onboardingOpen) {
       setLoading(false);

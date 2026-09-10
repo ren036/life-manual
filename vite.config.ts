@@ -2,11 +2,25 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import packageJson from './package.json';
 
+const deployedAt = new Date().toISOString();
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    {
+      name: 'emit-deployment-version',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'version.json',
+          source: JSON.stringify({ deployedAt }),
+        });
+      },
+    },
+  ],
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
-    __DEPLOYED_AT__: JSON.stringify(new Date().toISOString()),
+    __DEPLOYED_AT__: JSON.stringify(deployedAt),
   },
   build: {
     rollupOptions: {

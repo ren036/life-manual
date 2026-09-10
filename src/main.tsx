@@ -4,6 +4,7 @@ import { createTheme, MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
 import App from './App';
+import { registerServiceWorker } from './serviceWorker';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import './styles.css';
@@ -53,11 +54,4 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    void navigator.serviceWorker.register(
-      `/service-worker.js?v=${encodeURIComponent(__DEPLOYED_AT__)}`,
-      { updateViaCache: 'none' },
-    );
-  });
-}
+registerServiceWorker();

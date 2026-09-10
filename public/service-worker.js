@@ -98,7 +98,10 @@ async function cacheAppShell() {
 
 self.addEventListener('install', (event) => {
   event.waitUntil(cacheAppShell());
-  self.skipWaiting();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('periodicsync', (event) => {
@@ -145,10 +148,12 @@ self.addEventListener('fetch', (event) => {
   if (event.request.mode === 'navigate') {
     event.respondWith(
       (async () => {
+        const cached = (await caches.match(event.request)) || (await caches.match('/'));
+        if (cached) return cached;
         try {
           return await fetchAndCache();
         } catch {
-          return (await caches.match(event.request)) || caches.match('/');
+          return Response.error();
         }
       })(),
     );
