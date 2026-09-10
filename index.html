@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
     />
-    <meta name="theme-color" content="#2f6b4f" />
+    <meta name="theme-color" content="#f7f6f2" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="生活手册" />
@@ -14,6 +14,27 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <title>生活手册</title>
+    <script>
+      (() => {
+        try {
+          const savedColorScheme = localStorage.getItem('mantine-color-scheme-value');
+          const colorScheme =
+            savedColorScheme === 'dark' || savedColorScheme === 'light'
+              ? savedColorScheme
+              : savedColorScheme === 'auto'
+                ? matchMedia('(prefers-color-scheme: dark)').matches
+                  ? 'dark'
+                  : 'light'
+                : 'light';
+
+          document.documentElement.dataset.mantineColorScheme = colorScheme;
+          document.documentElement.style.colorScheme = colorScheme;
+          document
+            .querySelector('meta[name="theme-color"]')
+            ?.setAttribute('content', colorScheme === 'dark' ? '#151916' : '#f7f6f2');
+        } catch {}
+      })();
+    </script>
     <style>
       html,
       body,
@@ -24,7 +45,12 @@
 
       html,
       body {
-        background: #f8f9fa;
+        background: #f7f6f2;
+      }
+
+      html[data-mantine-color-scheme='dark'],
+      html[data-mantine-color-scheme='dark'] body {
+        background: #151916;
       }
 
       .app-boot {
@@ -35,7 +61,8 @@
         justify-items: center;
         gap: 14px;
         color: #285d45;
-        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
       }
 
       .app-boot__mark {
@@ -55,6 +82,15 @@
         font-size: 17px;
         font-weight: 750;
         letter-spacing: 0.08em;
+      }
+
+      html[data-mantine-color-scheme='dark'] .app-boot {
+        color: #badcc8;
+      }
+
+      html[data-mantine-color-scheme='dark'] .app-boot__mark {
+        background: #478f65;
+        box-shadow: 0 10px 28px rgb(0 0 0 / 32%);
       }
     </style>
   </head>

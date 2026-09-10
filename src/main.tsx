@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createTheme, MantineProvider } from '@mantine/core';
+import { createTheme, localStorageColorSchemeManager, MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
 import App from './App';
@@ -43,9 +43,17 @@ const theme = createTheme({
   },
 });
 
+const colorSchemeManager = localStorageColorSchemeManager({
+  key: 'mantine-color-scheme-value',
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <MantineProvider theme={theme} defaultColorScheme="light">
+    <MantineProvider
+      theme={theme}
+      defaultColorScheme="light"
+      colorSchemeManager={colorSchemeManager}
+    >
       <ModalsProvider labels={{ confirm: '确认', cancel: '取消' }}>
         <Notifications position="bottom-center" limit={3} />
         <App />
