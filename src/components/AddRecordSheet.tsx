@@ -30,7 +30,6 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { recordAttachments } from '../attachments';
 import { categoryOptions, parseTags } from '../categories';
-import { parseIngredients } from '../ingredients';
 import { recognizeDocument } from '../ocr';
 import { parseRelatedRecordKey, relatedRecordKey } from '../relatedRecords';
 import { monthDayForRepeat } from '../recurrence';
@@ -72,6 +71,13 @@ const labels: Record<AddMode, string> = {
   documents: '保存资料',
   tasks: '新建待办',
 };
+
+function parseIngredients(value: string): string[] {
+  return value
+    .split(/\r?\n|[，,、]+/)
+    .map((ingredient) => ingredient.trim())
+    .filter(Boolean);
+}
 
 export function AddRecordSheet({
   open,

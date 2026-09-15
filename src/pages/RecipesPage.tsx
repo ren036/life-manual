@@ -6,31 +6,20 @@ import {
   Center,
   Drawer,
   Group,
-  Input,
   Paper,
-  Select,
   SimpleGrid,
   Stack,
   Text,
-  TextInput,
   ThemeIcon,
 } from '@mantine/core';
-import { Check, Clipboard, Search, ShoppingCart, Star, Utensils, X } from 'lucide-react';
+import { Check, Clipboard, ShoppingCart, Star, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { recipeCover } from '../attachments';
 import { AttachmentPreview } from '../components/AttachmentPreview';
+import { CollectionToolbar, FilterChips } from '../components/CollectionToolbar';
 import { buildShoppingList, shoppingAmountLabel, shoppingListText } from '../shoppingList';
 import type { Recipe } from '../types';
 type SortMode = '最近添加' | '名称排序';
-
-function recipeCover(item: Recipe) {
-  const latestPhoto = [...(item.cookingRecords || [])]
-    .sort((a, b) => b.createdAt - a.createdAt)[0]
-    ?.attachments.find((attachment) => attachment.type.startsWith('image/'));
-  return {
-    id: latestPhoto?.id || item.attachments?.[0]?.id || item.id,
-    available: !!latestPhoto || !!item.hasFile,
-  };
-}
 
 export function RecipesPage({
   recipes,
@@ -117,31 +106,19 @@ export function RecipesPage({
 
   return (
     <Stack gap="md">
-      <Group wrap="nowrap" align="stretch" gap="sm">
-        <TextInput
-          flex={1}
-          aria-label="搜索菜谱"
-          leftSection={<Search size={18} strokeWidth={1.8} color="var(--mantine-color-green-8)" />}
-          value={query}
-          onChange={(e) => setQuery(e.currentTarget.value)}
-          placeholder="搜索菜名、食材或标签"
-          rightSection={
-            query ? <Input.ClearButton aria-label="清除搜索" onClick={() => setQuery('')} /> : null
-          }
-        />
-        <Select
-          w={92}
-          aria-label="菜谱排序"
-          value={sort}
-          onChange={(value) => setSort((value || '最近添加') as SortMode)}
-          data={[
-            { value: '最近添加', label: '最新' },
-            { value: '名称排序', label: '名称' },
-          ]}
-          allowDeselect={false}
-          radius="md"
-        />
-      </Group>
+      <CollectionToolbar
+        query={query}
+        onQueryChange={setQuery}
+        searchLabel="搜索菜谱"
+        searchPlaceholder="搜索菜名、食材或标签"
+        sort={sort}
+        onSortChange={(value) => setSort(value as SortMode)}
+        sortLabel="菜谱排序"
+        sortOptions={[
+          { value: '最近添加', label: '最新' },
+          { value: '名称排序', label: '名称' },
+        ]}
+      />
       <Group justify="space-between" align="center" gap="sm">
         <Text size="xs" c="dimmed">
           {selecting ? '点击菜谱进行多选' : '选几道菜，自动汇总要买的食材'}
@@ -155,20 +132,7 @@ export function RecipesPage({
           {selecting ? '取消选菜' : '选菜买菜'}
         </Button>
       </Group>
-      <Group gap="xs" wrap="wrap">
-        {categories.map((item) => (
-          <Button
-            key={item.value}
-            size="compact-sm"
-            radius="md"
-            color={filter === item.value ? 'green' : 'gray'}
-            variant={filter === item.value ? 'filled' : 'subtle'}
-            onClick={() => setFilter(item.value)}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </Group>
+      <FilterChips value={filter} onChange={setFilter} options={categories} />
       {shown.length ? (
         <SimpleGrid cols={2} spacing="sm">
           {shown.map((item, index) => {

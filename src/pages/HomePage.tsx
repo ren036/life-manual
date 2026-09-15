@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Center,
-  CloseButton,
   Group,
   Input,
   Paper,
@@ -29,6 +28,7 @@ import {
   Utensils,
 } from 'lucide-react';
 import { ReactNode, useMemo, useState } from 'react';
+import { recipeCover } from '../attachments';
 import { AttachmentPreview } from '../components/AttachmentPreview';
 import { daysFromDate, dueLabel } from '../dueDates';
 import type { AddMode, AppTab, DocumentItem, Recipe, TaskItem } from '../types';
@@ -44,15 +44,6 @@ interface Props {
   onBackup: () => void;
 }
 
-function recipeCover(item: Recipe) {
-  const latestPhoto = [...(item.cookingRecords || [])]
-    .sort((a, b) => b.createdAt - a.createdAt)[0]
-    ?.attachments.find((attachment) => attachment.type.startsWith('image/'));
-  return {
-    id: latestPhoto?.id || item.attachments?.[0]?.id || item.id,
-    available: !!latestPhoto || !!item.hasFile,
-  };
-}
 function ResultButton({
   icon,
   title,

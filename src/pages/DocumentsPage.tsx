@@ -1,19 +1,8 @@
-import {
-  Badge,
-  Button,
-  Center,
-  Group,
-  Input,
-  Paper,
-  Select,
-  Stack,
-  Text,
-  TextInput,
-  ThemeIcon,
-} from '@mantine/core';
-import { CalendarClock, FileText, Search, Star } from 'lucide-react';
+import { Badge, Button, Center, Group, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
+import { CalendarClock, FileText, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { AttachmentPreview } from '../components/AttachmentPreview';
+import { CollectionToolbar, FilterChips } from '../components/CollectionToolbar';
 import { dueLabel, dueStatus } from '../dueDates';
 import type { DocumentItem } from '../types';
 type SortMode = '最近添加' | '名称排序' | '到期优先';
@@ -75,46 +64,21 @@ export function DocumentsPage({
   );
   return (
     <Stack gap="md">
-      <Group wrap="nowrap" align="stretch" gap="sm">
-        <TextInput
-          flex={1}
-          aria-label="搜索资料"
-          leftSection={<Search size={18} strokeWidth={1.8} color="var(--mantine-color-green-8)" />}
-          value={query}
-          onChange={(e) => setQuery(e.currentTarget.value)}
-          placeholder="搜索资料与标签"
-          rightSection={
-            query ? <Input.ClearButton aria-label="清除搜索" onClick={() => setQuery('')} /> : null
-          }
-        />
-        <Select
-          w={92}
-          aria-label="资料排序"
-          value={sort}
-          onChange={(value) => setSort((value || '最近添加') as SortMode)}
-          data={[
-            { value: '最近添加', label: '最新' },
-            { value: '名称排序', label: '名称' },
-            { value: '到期优先', label: '到期' },
-          ]}
-          allowDeselect={false}
-          radius="md"
-        />
-      </Group>
-      <Group gap="xs" wrap="wrap">
-        {categories.map((item) => (
-          <Button
-            key={item.value}
-            size="compact-sm"
-            radius="md"
-            color={filter === item.value ? 'green' : 'gray'}
-            variant={filter === item.value ? 'filled' : 'subtle'}
-            onClick={() => setFilter(item.value)}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </Group>
+      <CollectionToolbar
+        query={query}
+        onQueryChange={setQuery}
+        searchLabel="搜索资料"
+        searchPlaceholder="搜索资料与标签"
+        sort={sort}
+        onSortChange={(value) => setSort(value as SortMode)}
+        sortLabel="资料排序"
+        sortOptions={[
+          { value: '最近添加', label: '最新' },
+          { value: '名称排序', label: '名称' },
+          { value: '到期优先', label: '到期' },
+        ]}
+      />
+      <FilterChips value={filter} onChange={setFilter} options={categories} />
       <Stack gap="sm">
         {shown.map((item) => (
           <Paper

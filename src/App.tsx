@@ -7,7 +7,6 @@ import {
   Radio,
   Stack,
   Text,
-  ThemeIcon,
   Title,
   useComputedColorScheme,
   useMantineColorScheme,
@@ -25,6 +24,7 @@ import { SettingsSheet } from './components/SettingsSheet';
 import { TrashSheet } from './components/TrashSheet';
 import { WelcomeGuide } from './components/WelcomeGuide';
 import { isBackupOverdue } from './dataSafety';
+import { daysFromDate, localDateKey } from './dueDates';
 import { DocumentsPage } from './pages/DocumentsPage';
 import { HomePage } from './pages/HomePage';
 import { NotesPage } from './pages/NotesPage';
@@ -90,14 +90,6 @@ type SavedItem = Recipe | DocumentItem | TaskItem;
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
-function dateKey(date = new Date()) {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
-function daysFromToday(value: string, today: string): number {
-  return Math.round(
-    (new Date(`${value}T00:00:00`).getTime() - new Date(`${today}T00:00:00`).getTime()) / 86400000,
-  );
 }
 async function configurePeriodicReminders(enabled: boolean) {
   const registration = await navigator.serviceWorker.ready;
@@ -213,7 +205,7 @@ export default function App() {
       });
     });
   }, []);
-  
+
   useEffect(() => {
     if (onboardingOpen) {
       setLoading(false);
@@ -247,13 +239,13 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (loading || !notificationsEnabled || Notification.permission !== 'granted') return;
-    const today = dateKey();
+    const today = localDateKey();
     const taskDays = tasks
       .filter((item) => !item.completed && item.dueDate)
-      .map((item) => daysFromToday(item.dueDate!, today));
+      .map((item) => daysFromDate(item.dueDate, today)!);
     const documentDays = documents
       .filter((item) => item.expiryDate)
-      .map((item) => daysFromToday(item.expiryDate!, today));
+      .map((item) => daysFromDate(item.expiryDate, today)!);
     const dueTasks = taskDays.filter((days) => days >= 0 && days <= 7).length;
     const overdueTasks = taskDays.filter((days) => days < 0).length;
     const expiring = documentDays.filter((days) => days >= 0 && days <= 7).length;
@@ -665,7 +657,7 @@ export default function App() {
     );
     const link = document.createElement('a');
     link.href = url;
-    link.download = `生活手册备份-${dateKey()}.json`;
+    link.download = `生活手册备份-${localDateKey()}.json`;
     link.click();
     URL.revokeObjectURL(url);
     const savedAt = Date.now();

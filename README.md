@@ -31,9 +31,10 @@ life-manual/
 ├─ public/                 # PWA 清单和离线缓存脚本
 ├─ src/
 │  ├─ components/         # 通用界面组件
-│  ├─ data/               # 初始示例数据
-│  ├─ pages/              # 首页、搜索、找菜和记录页面
+│  ├─ pages/              # 首页、随记、菜谱、资料、待办和详情页面
 │  ├─ storage/            # 本地记录与附件存储
+│  ├─ attachments.ts      # 附件与菜谱封面工具
+│  ├─ dueDates.ts         # 日期计算与到期状态
 │  ├─ App.tsx             # 应用入口和全局状态
 │  ├─ main.tsx            # React 启动文件
 │  ├─ styles.css          # 全局样式
