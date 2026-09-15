@@ -14,6 +14,7 @@ import type {
 
 const DATABASE_NAME = 'life-manual';
 const DATABASE_VERSION = 6;
+const SEED_REMOVAL_VERSION = 6;
 const RECORDS_STORE = 'records';
 const ATTACHMENTS_STORE = 'attachments';
 const RECIPES_STORE = 'recipes';
@@ -29,16 +30,33 @@ const DEPRECATED_SEED_IDS = {
   tasks: ['task-backup', 'task-shopping'],
 } as const;
 
+function recordStore(item: Recipe | DocumentItem): string {
+  return 'ingredients' in item ? RECIPES_STORE : DOCUMENTS_STORE;
+}
+
+function trashStore(kind: TrashEntry['kind']): string {
+  switch (kind) {
+    case 'recipe':
+      return RECIPES_STORE;
+    case 'document':
+      return DOCUMENTS_STORE;
+    case 'task':
+      return TASKS_STORE;
+    case 'note':
+      return NOTES_STORE;
+  }
+}
+
 export type ImportMode = 'merge' | 'replace';
 
-export interface BackupFile {
+interface BackupFile {
   id: string;
   name: string;
   type: string;
   data: string;
 }
 
-export interface LifeManualBackup {
+interface LifeManualBackup {
   version: 4;
   exportedAt: string;
   recipes: Recipe[];
@@ -65,6 +83,7 @@ function openDatabase(): Promise<IDBDatabase> {
     const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = (event) => {
       const database = request.result;
+      const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
       if (!database.objectStoreNames.contains(RECORDS_STORE)) {
         database.createObjectStore(RECORDS_STORE, { keyPath: 'id' });
       }
@@ -81,18 +100,17 @@ function openDatabase(): Promise<IDBDatabase> {
         database.createObjectStore(NOTES_STORE, { keyPath: 'id' });
       if (!database.objectStoreNames.contains(SETTINGS_STORE))
         database.createObjectStore(SETTINGS_STORE);
-      if ((event as IDBVersionChangeEvent).oldVersion > 0) {
-        const transaction = request.transaction;
+      if (oldVersion > 0 && oldVersion < SEED_REMOVAL_VERSION) {
+        const transaction = request.transaction!;
         DEPRECATED_SEED_IDS.recipes.forEach((id) =>
-          transaction?.objectStore(RECIPES_STORE).delete(id),
+          transaction.objectStore(RECIPES_STORE).delete(id),
         );
         DEPRECATED_SEED_IDS.documents.forEach((id) =>
-          transaction?.objectStore(DOCUMENTS_STORE).delete(id),
+          transaction.objectStore(DOCUMENTS_STORE).delete(id),
         );
-        DEPRECATED_SEED_IDS.tasks.forEach((id) => transaction?.objectStore(TASKS_STORE).delete(id));
+        DEPRECATED_SEED_IDS.tasks.forEach((id) => transaction.objectStore(TASKS_STORE).delete(id));
       }
-      if ((event as IDBVersionChangeEvent).oldVersion > 0)
-        request.transaction?.objectStore(SETTINGS_STORE).put(true, 'initialized');
+      if (oldVersion > 0) request.transaction?.objectStore(SETTINGS_STORE).put(true, 'initialized');
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -210,7 +228,7 @@ export async function updateRecord(
 ): Promise<void> {
   const retained = new Set(attachmentIds(item));
   const removed = attachmentIds(previous).filter((id) => !retained.has(id));
-  await putItem('ingredients' in item ? RECIPES_STORE : DOCUMENTS_STORE, item, files, removed);
+  await putItem(recordStore(item), item, files, removed);
 }
 
 export const insertTask = (item: TaskItem) => putItem(TASKS_STORE, item);
@@ -278,21 +296,16 @@ export async function claimReminderDate(date: string): Promise<boolean> {
   return true;
 }
 
-export async function deleteRecord(item: Recipe | DocumentItem): Promise<PendingAttachment[]> {
-  await putItem('ingredients' in item ? RECIPES_STORE : DOCUMENTS_STORE, {
+export async function deleteRecord(item: Recipe | DocumentItem): Promise<void> {
+  await putItem(recordStore(item), {
     ...item,
     deletedAt: Date.now(),
   });
-  return [];
 }
 
-export const restoreRecord = (item: Recipe | DocumentItem, files: PendingAttachment[]) => {
+export const restoreRecord = (item: Recipe | DocumentItem) => {
   const { deletedAt: _deletedAt, ...restored } = item;
-  return putItem(
-    'ingredients' in item ? RECIPES_STORE : DOCUMENTS_STORE,
-    restored as Recipe | DocumentItem,
-    files,
-  );
+  return putItem(recordStore(item), restored as Recipe | DocumentItem);
 };
 
 export async function deleteTask(item: TaskItem): Promise<void> {
@@ -369,15 +382,7 @@ async function permanentlyDeleteEntries(
     )
     .forEach((task) => taskStore.put({ ...task, relatedRecord: undefined }));
   entries.forEach((entry) => {
-    const store =
-      entry.kind === 'recipe'
-        ? RECIPES_STORE
-        : entry.kind === 'document'
-          ? DOCUMENTS_STORE
-          : entry.kind === 'task'
-            ? TASKS_STORE
-            : NOTES_STORE;
-    transaction.objectStore(store).delete(entry.item.id);
+    transaction.objectStore(trashStore(entry.kind)).delete(entry.item.id);
     if (entry.kind === 'note') {
       if (entry.item.audio) attachments.delete(entry.item.audio.id);
     } else if (entry.kind !== 'task') {
@@ -402,15 +407,7 @@ export async function loadTrash(): Promise<TrashEntry[]> {
 
 export async function restoreTrashEntry(entry: TrashEntry): Promise<void> {
   const { deletedAt: _deletedAt, ...restored } = entry.item;
-  const store =
-    entry.kind === 'recipe'
-      ? RECIPES_STORE
-      : entry.kind === 'document'
-        ? DOCUMENTS_STORE
-        : entry.kind === 'task'
-          ? TASKS_STORE
-          : NOTES_STORE;
-  await putItem(store, restored as Recipe | DocumentItem | TaskItem | NoteEntry);
+  await putItem(trashStore(entry.kind), restored as Recipe | DocumentItem | TaskItem | NoteEntry);
 }
 
 export async function permanentlyDeleteTrashEntry(entry: TrashEntry): Promise<void> {
@@ -865,16 +862,4 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
-}
-
-export async function openAttachment(id: string): Promise<boolean> {
-  const database = await openDatabase();
-  const file = (await requestResult(
-    database.transaction(ATTACHMENTS_STORE).objectStore(ATTACHMENTS_STORE).get(id),
-  )) as Blob | undefined;
-  if (!file) return false;
-  const url = URL.createObjectURL(file);
-  window.open(url, '_blank', 'noopener,noreferrer');
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  return true;
 }

@@ -1,5 +1,5 @@
-export const RETENTION_DAYS = 30;
-export const BACKUP_REMINDER_DAYS = 30;
+const RETENTION_DAYS = 30;
+const BACKUP_REMINDER_DAYS = 30;
 
 const DAY_MS = 86400000;
 

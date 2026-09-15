@@ -1,6 +1,6 @@
 import type { TaskItem } from './types';
 
-export type DueStatus = 'overdue' | 'today' | 'within7' | 'within30' | 'later' | 'none';
+type DueStatus = 'overdue' | 'today' | 'within7' | 'within30' | 'later' | 'none';
 
 export function localDateKey(date = new Date()): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -30,6 +30,16 @@ export function dueLabel(value?: string, today = localDateKey()): string {
   if (days < 0) return `已过期 ${Math.abs(days)} 天`;
   if (days === 0) return '今天到期';
   return `${days} 天后到期`;
+}
+
+export function taskDueLabel(value?: string, today = localDateKey()): string {
+  const days = daysFromDate(value, today);
+  if (days === undefined) return '没有截止日期';
+  if (days < 0) return `已逾期 ${Math.abs(days)} 天`;
+  if (days === 0) return '今天截止';
+  if (days <= 7) return `${days} 天后截止`;
+  const due = new Date(`${value}T00:00:00`);
+  return `${due.getMonth() + 1} 月 ${due.getDate()} 日`;
 }
 
 const priorityRank: Record<TaskItem['priority'], number> = { 紧急: 0, 重要: 1, 普通: 2 };

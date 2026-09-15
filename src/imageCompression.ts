@@ -1,6 +1,6 @@
 const MAX_DIMENSION = 2000;
 const JPEG_QUALITY = 0.82;
-export async function compressImage(file: File): Promise<File> {
+async function compressImage(file: File): Promise<File> {
   if (
     !file.type.startsWith('image/') ||
     file.type === 'image/gif' ||

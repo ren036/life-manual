@@ -1,6 +1,6 @@
 import type { Recipe } from './types';
 
-export interface ShoppingListItem {
+interface ShoppingListItem {
   name: string;
   amounts: string[];
   unspecifiedCount: number;

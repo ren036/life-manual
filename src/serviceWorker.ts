@@ -64,6 +64,24 @@ export function onAppUpdateAvailable(listener: UpdateListener) {
   };
 }
 
+export async function configurePeriodicReminders(enabled: boolean): Promise<void> {
+  const registration = await navigator.serviceWorker.ready;
+  const periodicSync = (
+    registration as ServiceWorkerRegistration & {
+      periodicSync?: {
+        register: (tag: string, options: { minInterval: number }) => Promise<void>;
+        unregister: (tag: string) => Promise<void>;
+      };
+    }
+  ).periodicSync;
+
+  if (enabled) {
+    await periodicSync?.register('life-manual-reminders', { minInterval: 86400000 });
+  } else {
+    await periodicSync?.unregister('life-manual-reminders');
+  }
+}
+
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
 

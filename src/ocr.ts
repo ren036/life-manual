@@ -1,9 +1,9 @@
-export interface OcrProgress {
+interface OcrProgress {
   status: string;
   progress: number;
 }
 
-export function cleanOcrText(value: string): string {
+function cleanOcrText(value: string): string {
   return value
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

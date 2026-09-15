@@ -1,8 +1,5 @@
 import type { TaskItem, TaskRepeatUnit } from './types';
-
-export function localDateKey(date = new Date()): string {
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
+import { localDateKey } from './dueDates';
 
 export function monthDayForRepeat(dueDate?: string, configured?: number): number {
   if (configured && configured >= 1 && configured <= 31) return Math.floor(configured);
@@ -90,4 +87,56 @@ export function repeatLabel(task: TaskItem): string {
   const interval = Math.max(1, task.repeatInterval || 1);
   if (task.repeat !== '自定义') return task.repeat;
   return `每 ${interval} ${task.repeatUnit || '天'}`;
+}
+
+type RecurringTaskReopenPlan =
+  | { status: 'ready' }
+  | { status: 'remove-successor'; successor: TaskItem }
+  | { status: 'blocked-by-legacy-history' }
+  | { status: 'blocked-by-linked-history' }
+  | { status: 'blocked-by-trash' };
+
+function isLegacySuccessor(parent: TaskItem, candidate: TaskItem): boolean {
+  return (
+    !candidate.generatedFromTaskId &&
+    candidate.id !== parent.id &&
+    candidate.title === parent.title &&
+    candidate.repeat === parent.repeat &&
+    candidate.repeatInterval === parent.repeatInterval &&
+    candidate.repeatUnit === parent.repeatUnit &&
+    candidate.repeatAnchorDate === parent.repeatAnchorDate &&
+    candidate.createdAt >= (parent.completedAt || parent.createdAt)
+  );
+}
+
+export function planRecurringTaskReopen(
+  task: TaskItem,
+  activeTasks: TaskItem[],
+  deletedTasks: TaskItem[],
+): RecurringTaskReopenPlan {
+  const linkedSuccessor = activeTasks.find(
+    (candidate) => candidate.generatedFromTaskId === task.id && !candidate.completed,
+  );
+  const legacySuccessors = linkedSuccessor
+    ? []
+    : activeTasks.filter((candidate) => isLegacySuccessor(task, candidate));
+
+  if (legacySuccessors.some((candidate) => candidate.completed)) {
+    return { status: 'blocked-by-legacy-history' };
+  }
+
+  const removableSuccessor =
+    linkedSuccessor || legacySuccessors.find((candidate) => !candidate.completed);
+  if (removableSuccessor) {
+    return { status: 'remove-successor', successor: removableSuccessor };
+  }
+
+  if (activeTasks.some((candidate) => candidate.generatedFromTaskId === task.id)) {
+    return { status: 'blocked-by-linked-history' };
+  }
+
+  const successorIsDeleted = deletedTasks.some(
+    (candidate) => candidate.generatedFromTaskId === task.id || isLegacySuccessor(task, candidate),
+  );
+  return successorIsDeleted ? { status: 'blocked-by-trash' } : { status: 'ready' };
 }

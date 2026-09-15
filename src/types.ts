@@ -14,13 +14,13 @@ export interface PendingAttachment extends Attachment {
   file: File;
 }
 
-export interface RecordStep {
+interface RecordStep {
   id: string;
   text: string;
   attachments: Attachment[];
 }
 
-export interface RecordContent {
+interface RecordContent {
   tags?: string[];
   attachments?: Attachment[];
   steps?: RecordStep[];

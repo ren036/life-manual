@@ -31,9 +31,9 @@ import { NotesPage } from './pages/NotesPage';
 import { RecipesPage } from './pages/RecipesPage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { TasksPage } from './pages/TasksPage';
-import { nextTaskDueDate } from './recurrence';
+import { nextTaskDueDate, planRecurringTaskReopen } from './recurrence';
 import { relatedRecordKey } from './relatedRecords';
-import { onAppUpdateAvailable } from './serviceWorker';
+import { configurePeriodicReminders, onAppUpdateAvailable } from './serviceWorker';
 import {
   advanceTask,
   bulkUpdateItems,
@@ -90,19 +90,6 @@ type SavedItem = Recipe | DocumentItem | TaskItem;
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
-async function configurePeriodicReminders(enabled: boolean) {
-  const registration = await navigator.serviceWorker.ready;
-  const periodicSync = (
-    registration as ServiceWorkerRegistration & {
-      periodicSync?: {
-        register: (tag: string, options: { minInterval: number }) => Promise<void>;
-        unregister: (tag: string) => Promise<void>;
-      };
-    }
-  ).periodicSync;
-  if (enabled) await periodicSync?.register('life-manual-reminders', { minInterval: 86400000 });
-  else await periodicSync?.unregister('life-manual-reminders');
 }
 function readRoute(): { tab: AppTab; id?: string } {
   const [tab, id] = window.location.hash.slice(1).split('/');
@@ -355,101 +342,15 @@ export default function App() {
       setErrorToast('删除失败，请重试');
     }
   }
-  async function toggleTask(item: TaskItem) {
+
+  async function runTaskAction(item: TaskItem, action: () => Promise<void>) {
     if (taskActionsRef.current.has(item.id)) return;
     taskActionsRef.current.add(item.id);
     setBusyTaskIds((current) => new Set(current).add(item.id));
     try {
-      const updated = {
-        ...item,
-        completed: !item.completed,
-        completedAt: item.completed ? undefined : Date.now(),
-        skipped: item.completed ? undefined : false,
-      };
-      if (item.completed && item.repeat) {
-        const linkedGenerated = tasks.find(
-          (task) => task.generatedFromTaskId === item.id && !task.completed && !task.deletedAt,
-        );
-        const legacySeriesTasks = linkedGenerated
-          ? []
-          : tasks.filter(
-              (task) =>
-                !task.generatedFromTaskId &&
-                !task.deletedAt &&
-                task.id !== item.id &&
-                task.title === item.title &&
-                task.repeat === item.repeat &&
-                task.repeatInterval === item.repeatInterval &&
-                task.repeatUnit === item.repeatUnit &&
-                task.repeatAnchorDate === item.repeatAnchorDate &&
-                task.createdAt >= (item.completedAt || item.createdAt),
-            );
-        if (legacySeriesTasks.some((task) => task.completed)) {
-          setErrorToast('这个重复计划已有后续完成记录，不能直接恢复较早的一次');
-          return;
-        }
-        const generated = linkedGenerated || legacySeriesTasks.find((task) => !task.completed);
-        if (generated) {
-          await reopenRecurringTask(updated, generated.id);
-          setTasks((current) =>
-            current
-              .filter((task) => task.id !== generated.id)
-              .map((task) => (task.id === item.id ? updated : task)),
-          );
-          setToast('已恢复，并撤销自动创建的下一次待办');
-          return;
-        }
-        if (tasks.some((task) => task.generatedFromTaskId === item.id)) {
-          setErrorToast('后续待办已经完成或删除，不能直接恢复这一次');
-          return;
-        }
-        if (
-          trashItems.some(
-            (entry) =>
-              entry.kind === 'task' &&
-              (entry.item.generatedFromTaskId === item.id ||
-                (!entry.item.generatedFromTaskId &&
-                  entry.item.id !== item.id &&
-                  entry.item.title === item.title &&
-                  entry.item.repeat === item.repeat &&
-                  entry.item.repeatInterval === item.repeatInterval &&
-                  entry.item.repeatUnit === item.repeatUnit &&
-                  entry.item.repeatAnchorDate === item.repeatAnchorDate &&
-                  entry.item.createdAt >= (item.completedAt || item.createdAt))),
-          )
-        ) {
-          setErrorToast('自动生成的下一次待办在回收站中，请先处理它再恢复这一次');
-          return;
-        }
-      }
-      if (!item.completed && item.repeat) {
-        const dueDate = nextTaskDueDate(item);
-        if (!dueDate) {
-          await advanceTask(updated);
-          setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
-          setToast('已完成，重复计划也已结束');
-          return;
-        }
-        const next: TaskItem = {
-          ...item,
-          id: crypto.randomUUID(),
-          completed: false,
-          completedAt: undefined,
-          skipped: undefined,
-          dueDate,
-          createdAt: Date.now(),
-          generatedFromTaskId: item.id,
-        };
-        await advanceTask(updated, next);
-        setTasks((current) => [
-          next,
-          ...current.map((task) => (task.id === item.id ? updated : task)),
-        ]);
-        setToast(`已创建下一次：${next.dueDate}`);
-        return;
-      }
-      await updateTask(updated);
-      setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
+      await action();
+    } catch {
+      setErrorToast('待办更新失败，请重试');
     } finally {
       taskActionsRef.current.delete(item.id);
       setBusyTaskIds((current) => {
@@ -459,43 +360,87 @@ export default function App() {
       });
     }
   }
-  async function skipTask(item: TaskItem) {
-    if (taskActionsRef.current.has(item.id)) return;
-    taskActionsRef.current.add(item.id);
-    setBusyTaskIds((current) => new Set(current).add(item.id));
-    try {
-      const updated = { ...item, completed: true, completedAt: Date.now(), skipped: true };
-      const dueDate = nextTaskDueDate(item);
-      if (!dueDate) {
-        await advanceTask(updated);
-        setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
-        setToast('已跳过，本次重复计划到此结束');
+
+  async function finishRecurringTask(item: TaskItem, skipped: boolean) {
+    const updated: TaskItem = {
+      ...item,
+      completed: true,
+      completedAt: Date.now(),
+      skipped,
+    };
+    const dueDate = nextTaskDueDate(item);
+    const next: TaskItem | undefined = dueDate
+      ? {
+          ...item,
+          id: crypto.randomUUID(),
+          completed: false,
+          completedAt: undefined,
+          skipped: undefined,
+          dueDate,
+          createdAt: Date.now(),
+          generatedFromTaskId: item.id,
+        }
+      : undefined;
+
+    await advanceTask(updated, next);
+    setTasks((current) => {
+      const updatedTasks = current.map((task) => (task.id === item.id ? updated : task));
+      return next ? [next, ...updatedTasks] : updatedTasks;
+    });
+    if (dueDate) {
+      setToast(skipped ? `已跳过本次，下一次：${dueDate}` : `已创建下一次：${dueDate}`);
+    } else {
+      setToast(skipped ? '已跳过，本次重复计划到此结束' : '已完成，重复计划也已结束');
+    }
+  }
+
+  async function toggleTask(item: TaskItem) {
+    await runTaskAction(item, async () => {
+      const updated = {
+        ...item,
+        completed: !item.completed,
+        completedAt: item.completed ? undefined : Date.now(),
+        skipped: item.completed ? undefined : false,
+      };
+      if (item.completed && item.repeat) {
+        const reopenPlan = planRecurringTaskReopen(
+          item,
+          tasks,
+          trashItems.flatMap((entry) => (entry.kind === 'task' ? [entry.item] : [])),
+        );
+        if (reopenPlan.status === 'blocked-by-legacy-history') {
+          setErrorToast('这个重复计划已有后续完成记录，不能直接恢复较早的一次');
+          return;
+        }
+        if (reopenPlan.status === 'blocked-by-linked-history') {
+          setErrorToast('后续待办已经完成或删除，不能直接恢复这一次');
+          return;
+        }
+        if (reopenPlan.status === 'remove-successor') {
+          await reopenRecurringTask(updated, reopenPlan.successor.id);
+          setTasks((current) =>
+            current
+              .filter((task) => task.id !== reopenPlan.successor.id)
+              .map((task) => (task.id === item.id ? updated : task)),
+          );
+          setToast('已恢复，并撤销自动创建的下一次待办');
+          return;
+        }
+        if (reopenPlan.status === 'blocked-by-trash') {
+          setErrorToast('自动生成的下一次待办在回收站中，请先处理它再恢复这一次');
+          return;
+        }
+      }
+      if (!item.completed && item.repeat) {
+        await finishRecurringTask(item, false);
         return;
       }
-      const next: TaskItem = {
-        ...item,
-        id: crypto.randomUUID(),
-        completed: false,
-        completedAt: undefined,
-        skipped: undefined,
-        dueDate,
-        createdAt: Date.now(),
-        generatedFromTaskId: item.id,
-      };
-      await advanceTask(updated, next);
-      setTasks((current) => [
-        next,
-        ...current.map((task) => (task.id === item.id ? updated : task)),
-      ]);
-      setToast(`已跳过本次，下一次：${dueDate}`);
-    } finally {
-      taskActionsRef.current.delete(item.id);
-      setBusyTaskIds((current) => {
-        const next = new Set(current);
-        next.delete(item.id);
-        return next;
-      });
-    }
+      await updateTask(updated);
+      setTasks((current) => current.map((task) => (task.id === item.id ? updated : task)));
+    });
+  }
+  async function skipTask(item: TaskItem) {
+    await runTaskAction(item, () => finishRecurringTask(item, true));
   }
   async function toggleFavorite(item: Recipe) {
     const updated = { ...item, favorite: !item.favorite };
@@ -601,7 +546,7 @@ export default function App() {
   }
   async function removeRecord(item: Recipe | DocumentItem) {
     try {
-      const files = await deleteRecord(item);
+      await deleteRecord(item);
       if ('ingredients' in item)
         setRecipes((current) => current.filter((record) => record.id !== item.id));
       else setDocuments((current) => current.filter((record) => record.id !== item.id));
@@ -616,7 +561,7 @@ export default function App() {
               variant="subtle"
               size="compact-sm"
               onClick={() => {
-                void restoreRecord(item, files)
+                void restoreRecord(item)
                   .then(() => {
                     if ('ingredients' in item) setRecipes((current) => [item, ...current]);
                     else setDocuments((current) => [item, ...current]);
