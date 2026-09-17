@@ -13,6 +13,11 @@ function daysFromToday(value, today) {
   );
 }
 
+function reminderText(title, date, days) {
+  const day = new Date(`${date}T00:00:00`).toLocaleDateString('zh-CN', { dateStyle: 'long' });
+  return `「${title}」${days < 0 ? '已于' : '将于'}${day}到期`;
+}
+
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DATABASE_NAME);
@@ -62,26 +67,22 @@ async function showDueReminders() {
     requestResult(database.transaction('tasks').objectStore('tasks').getAll()),
     requestResult(database.transaction('documents').objectStore('documents').getAll()),
   ]);
-  const taskDays = tasks
-    .filter((item) => !item.deletedAt && !item.completed && item.dueDate)
-    .map((item) => daysFromToday(item.dueDate, today));
-  const documentDays = documents
-    .filter((item) => !item.deletedAt && item.expiryDate)
-    .map((item) => daysFromToday(item.expiryDate, today));
-  const dueTasks = taskDays.filter((days) => days >= 0 && days <= 7).length;
-  const overdueTasks = taskDays.filter((days) => days < 0).length;
-  const expiring = documentDays.filter((days) => days >= 0 && days <= 7).length;
-  const expired = documentDays.filter((days) => days < 0).length;
-  if (!dueTasks && !overdueTasks && !expiring && !expired) return;
+  const taskParts = tasks.flatMap((item) => {
+    if (item.deletedAt || item.completed || !item.dueDate) return [];
+    const days = daysFromToday(item.dueDate, today);
+    if (!Number.isFinite(days) || days > 7) return [];
+    return [reminderText(item.title, item.dueDate, days)];
+  });
+  const documentParts = documents.flatMap((item) => {
+    if (item.deletedAt || !item.expiryDate) return [];
+    const days = daysFromToday(item.expiryDate, today);
+    if (!Number.isFinite(days) || days > 7) return [];
+    return [reminderText(item.title, item.expiryDate, days)];
+  });
+  if (!taskParts.length && !documentParts.length) return;
   if (!(await claimReminderDate(database, today))) return;
-  const parts = [
-    dueTasks ? `${dueTasks} 个待办将在 7 天内到期` : '',
-    overdueTasks ? `${overdueTasks} 个待办已逾期` : '',
-    expiring ? `${expiring} 份资料将在 7 天内到期` : '',
-    expired ? `${expired} 份资料已过期` : '',
-  ].filter(Boolean);
   await self.registration.showNotification('生活手册提醒', {
-    body: parts.join('，'),
+    body: [...taskParts, ...documentParts].join('，'),
     icon: '/icon.svg',
     tag: `life-manual-reminder-${today}`,
   });
@@ -114,8 +115,8 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       const existing = clients[0];
       return existing
-        ? existing.navigate('/#tasks').then(() => existing.focus())
-        : self.clients.openWindow('/#tasks');
+        ? existing.navigate('/#/tasks').then(() => existing.focus())
+        : self.clients.openWindow('/#/tasks');
     }),
   );
 });

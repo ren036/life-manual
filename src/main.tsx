@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { createTheme, localStorageColorSchemeManager, MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
 import { Notifications } from '@mantine/notifications';
+import { HashRouter } from 'react-router';
 import App from './App';
 import { registerServiceWorker } from './serviceWorker';
 import '@mantine/core/styles.css';
@@ -47,6 +48,16 @@ const colorSchemeManager = localStorageColorSchemeManager({
   key: 'mantine-color-scheme-value',
 });
 
+// 旧版本使用 #recipes/id 一类地址；HashRouter 使用 #/recipes/id。
+const legacyHash = window.location.hash.slice(1);
+if (legacyHash && !legacyHash.startsWith('/')) {
+  window.history.replaceState(
+    null,
+    '',
+    `${window.location.pathname}${window.location.search}#/${legacyHash}`,
+  );
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <MantineProvider
@@ -56,7 +67,9 @@ createRoot(document.getElementById('root')!).render(
     >
       <ModalsProvider labels={{ confirm: '确认', cancel: '取消' }}>
         <Notifications position="bottom-center" limit={3} />
-        <App />
+        <HashRouter>
+          <App />
+        </HashRouter>
       </ModalsProvider>
     </MantineProvider>
   </StrictMode>,
