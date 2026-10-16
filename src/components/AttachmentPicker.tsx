@@ -12,10 +12,12 @@ import {
   Stack,
   Text,
 } from '@mantine/core';
-import { Camera, FilePlus2, FileText, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Camera, Crop, FilePlus2, FileText, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { optimizeAttachments } from '../imageCompression';
+import { getAttachmentFiles } from '../storage/database';
 import { AttachmentPreview } from './AttachmentPreview';
+import { ImageCropDialog } from './ImageCropDialog';
 import type { DraftAttachment } from '../types';
 function LocalPreview({ file }: { file: File }) {
   const [url, setUrl] = useState('');
@@ -24,7 +26,7 @@ function LocalPreview({ file }: { file: File }) {
     setUrl(value);
     return () => URL.revokeObjectURL(value);
   }, [file]);
-  return <Image src={url} alt={file.name} w="100%" h="100%" fit="cover" />;
+  return <Image src={url || undefined} alt={file.name} w="100%" h="100%" fit="cover" />;
 }
 export function AttachmentPicker({
   files,
@@ -47,19 +49,107 @@ export function AttachmentPicker({
 }) {
   const [error, setError] = useState('');
   const [movingId, setMovingId] = useState<string>();
+  const [processing, setProcessing] = useState(false);
+  const [cropping, setCropping] = useState<{
+    selected: File[];
+    index: number;
+    attachmentId?: string;
+  }>();
+  const filesRef = useRef(files);
+  filesRef.current = files;
+  const activeRef = useRef(true);
+  const processingRef = useRef(false);
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+    };
+  }, []);
+  const busy = processing || !!cropping;
+
+  async function append(selected: File[]) {
+    processingRef.current = true;
+    setProcessing(true);
+    try {
+      const optimized = await optimizeAttachments(selected);
+      if (!activeRef.current) return;
+      onChange([
+        ...filesRef.current,
+        ...optimized.map((file) => ({
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: file.type,
+          file,
+        })),
+      ]);
+    } finally {
+      processingRef.current = false;
+      if (activeRef.current) setProcessing(false);
+    }
+  }
+
   async function pick(selected: File[]) {
+    if (processingRef.current || cropping || !selected.length) return;
     const accepted = selected.filter((file) => !imagesOnly || file.type.startsWith('image/'));
     setError(accepted.length !== selected.length ? '这里只能添加图片，请重新选择。' : '');
-    const optimized = await optimizeAttachments(accepted);
-    onChange([
-      ...files,
-      ...optimized.map((file) => ({
-        id: crypto.randomUUID(),
-        name: file.name,
-        type: file.type,
-        file,
-      })),
-    ]);
+    if (!accepted.length) return;
+    const index = accepted.findIndex((file) => file.type.startsWith('image/'));
+    if (index >= 0) setCropping({ selected: accepted, index });
+    else await append(accepted);
+  }
+
+  async function edit(attachment: DraftAttachment) {
+    if (processingRef.current || cropping) return;
+    processingRef.current = true;
+    setProcessing(true);
+    setError('');
+    try {
+      const file = attachment.file || (await getAttachmentFiles([attachment]))[0]?.file;
+      if (!activeRef.current) return;
+      if (!file) throw new Error('missing image');
+      setCropping({ selected: [file], index: 0, attachmentId: attachment.id });
+    } catch {
+      if (activeRef.current) setError('无法读取这张照片，请重新添加后裁剪。');
+    } finally {
+      processingRef.current = false;
+      if (activeRef.current) setProcessing(false);
+    }
+  }
+
+  async function finishCrop(file?: File) {
+    if (!cropping) return;
+    if (cropping.attachmentId) {
+      if (file) {
+        const [optimized] = await optimizeAttachments([file]);
+        if (!activeRef.current) return;
+        // A new ID keeps the saved attachment intact until the record is saved.
+        onChange(
+          filesRef.current.map((item) =>
+            item.id === cropping.attachmentId
+              ? {
+                  id: crypto.randomUUID(),
+                  name: optimized.name,
+                  type: optimized.type,
+                  file: optimized,
+                }
+              : item,
+          ),
+        );
+      }
+    } else {
+      const selected = cropping.selected.map((original, index) =>
+        index === cropping.index && file ? file : original,
+      );
+      const index = selected.findIndex(
+        (item, index) => index > cropping.index && item.type.startsWith('image/'),
+      );
+      if (index >= 0) {
+        setCropping({ selected, index });
+        return;
+      }
+      await append(selected);
+    }
+    if (activeRef.current) setCropping(undefined);
   }
   return (
     <Stack gap="xs">
@@ -70,7 +160,14 @@ export function AttachmentPicker({
           onChange={(selected) => void pick(selected)}
         >
           {(props) => (
-            <Button {...props} variant="light" leftSection={<FilePlus2 size={18} />} fullWidth>
+            <Button
+              {...props}
+              disabled={busy}
+              loading={processing}
+              variant="light"
+              leftSection={<FilePlus2 size={18} />}
+              fullWidth
+            >
               {label}
             </Button>
           )}
@@ -82,7 +179,7 @@ export function AttachmentPicker({
             onChange={(selected) => selected && void pick([selected])}
           >
             {(props) => (
-              <Button {...props} variant="light" leftSection={<Camera size={18} />}>
+              <Button {...props} disabled={busy} variant="light" leftSection={<Camera size={18} />}>
                 拍照扫描
               </Button>
             )}
@@ -90,7 +187,7 @@ export function AttachmentPicker({
         )}
       </Group>
       <Text c="dimmed" size="xs">
-        大图片会在设备上自动压缩后保存，原图不会上传。
+        选择照片后可裁剪或使用原图，添加后也可再次裁剪。大图片会在设备上自动压缩，照片不会上传。
       </Text>
       {!!files.length && (
         <SimpleGrid cols={3} spacing="xs">
@@ -113,11 +210,25 @@ export function AttachmentPicker({
                 <Text size="xs" truncate title={attachment.name}>
                   {attachment.name}
                 </Text>
+                {attachment.type.startsWith('image/') && (
+                  <Button
+                    type="button"
+                    variant="light"
+                    size="compact-xs"
+                    leftSection={<Crop size={13} />}
+                    disabled={busy}
+                    aria-label={`裁剪照片 ${index + 1}：${attachment.name}`}
+                    onClick={() => void edit(attachment)}
+                  >
+                    裁剪
+                  </Button>
+                )}
                 {onMove && (
                   <Button
                     type="button"
                     variant="subtle"
                     size="compact-xs"
+                    disabled={busy}
                     onClick={() =>
                       setMovingId(movingId === attachment.id ? undefined : attachment.id)
                     }
@@ -127,6 +238,7 @@ export function AttachmentPicker({
                 )}
                 {onMove && movingId === attachment.id && (
                   <Select
+                    disabled={busy}
                     size="xs"
                     placeholder="选择步骤"
                     data={[
@@ -148,6 +260,7 @@ export function AttachmentPicker({
                     type="button"
                     variant="subtle"
                     size="compact-xs"
+                    disabled={busy}
                     onClick={() => onReturn(attachment.id)}
                   >
                     移回顶部
@@ -163,6 +276,7 @@ export function AttachmentPicker({
                   size="sm"
                   radius="xl"
                   aria-label={`移除图片或文件 ${index + 1}：${attachment.name}`}
+                  disabled={busy}
                   onClick={() => onChange(files.filter((item) => item.id !== attachment.id))}
                 >
                   <X size={15} />
@@ -176,6 +290,20 @@ export function AttachmentPicker({
         <Text c="red" size="sm" role="alert">
           {error}
         </Text>
+      )}
+      {cropping && (
+        <ImageCropDialog
+          key={`${cropping.attachmentId || 'new'}-${cropping.index}`}
+          file={cropping.selected[cropping.index]}
+          progress={
+            cropping.attachmentId
+              ? undefined
+              : `${cropping.selected.slice(0, cropping.index + 1).filter((file) => file.type.startsWith('image/')).length} / ${cropping.selected.filter((file) => file.type.startsWith('image/')).length}`
+          }
+          onApply={finishCrop}
+          onOriginal={() => finishCrop()}
+          onClose={() => setCropping(undefined)}
+        />
       )}
     </Stack>
   );
