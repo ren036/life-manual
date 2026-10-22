@@ -1,0 +1,24 @@
+.filter-chips {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+.app-page .mantine-Input-input {
+  font-size: 16px;
+}
+.app-page .mantine-Button-root {
+  min-height: 44px;
+}
+.app-page .mantine-SegmentedControl-label {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.app-page .mantine-Text-root {
+  overflow-wrap: anywhere;
+}

@@ -1,4 +1,4 @@
-export type AppTab = 'home' | 'notes' | 'recipes' | 'documents' | 'tasks';
+export type AppTab = 'home' | 'records' | 'tasks' | 'profile' | 'notes' | 'recipes' | 'documents';
 export type AddMode = 'recipes' | 'documents' | 'tasks';
 
 export interface Attachment {

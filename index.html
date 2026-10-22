@@ -2,11 +2,8 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
-    />
-    <meta name="theme-color" content="#f7f6f2" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#fcfcfb" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="生活手册" />
@@ -31,7 +28,7 @@
           document.documentElement.style.colorScheme = colorScheme;
           document
             .querySelector('meta[name="theme-color"]')
-            ?.setAttribute('content', colorScheme === 'dark' ? '#151916' : '#f7f6f2');
+            ?.setAttribute('content', colorScheme === 'dark' ? '#181e25' : '#fcfcfb');
         } catch {}
       })();
     </script>
@@ -45,12 +42,12 @@
 
       html,
       body {
-        background: #f7f6f2;
+        background: #fcfcfb;
       }
 
       html[data-mantine-color-scheme='dark'],
       html[data-mantine-color-scheme='dark'] body {
-        background: #151916;
+        background: #181e25;
       }
 
       .app-boot {
@@ -60,7 +57,7 @@
         place-content: center;
         justify-items: center;
         gap: 14px;
-        color: #285d45;
+        color: #456681;
         font-family:
           -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
       }
@@ -71,11 +68,11 @@
         height: 58px;
         place-items: center;
         border-radius: 18px;
-        background: #2f6b4f;
+        background: #456681;
         color: white;
         font-size: 29px;
         font-weight: 800;
-        box-shadow: 0 10px 28px rgb(47 107 79 / 18%);
+        box-shadow: 0 10px 28px rgb(69 102 129 / 18%);
       }
 
       .app-boot__title {
@@ -85,11 +82,11 @@
       }
 
       html[data-mantine-color-scheme='dark'] .app-boot {
-        color: #badcc8;
+        color: #c9d9e6;
       }
 
       html[data-mantine-color-scheme='dark'] .app-boot__mark {
-        background: #478f65;
+        background: #6d90ae;
         box-shadow: 0 10px 28px rgb(0 0 0 / 32%);
       }
     </style>

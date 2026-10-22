@@ -10,36 +10,38 @@ import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import './styles.css';
 import './theme.css';
+import './redesign.css';
 
 const theme = createTheme({
-  primaryColor: 'green',
+  primaryColor: 'blue',
   primaryShade: 7,
-  defaultRadius: 'lg',
+  defaultRadius: 'md',
+  radius: { xs: '4px', sm: '6px', md: '10px', lg: '14px', xl: '20px' },
   fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
   headings: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
-    fontWeight: '800',
+    fontWeight: '650',
   },
-  defaultGradient: { from: 'green.8', to: 'green.6', deg: 135 },
+  defaultGradient: { from: 'blue.8', to: 'blue.6', deg: 135 },
   components: {
-    Button: { defaultProps: { radius: 'xl' } },
+    Button: { defaultProps: { radius: 'md', fw: 600 } },
     ActionIcon: { defaultProps: { radius: 'xl' } },
-    TextInput: { defaultProps: { radius: 'lg', size: 'md' } },
+    TextInput: { defaultProps: { radius: 'md', size: 'md' } },
     Select: { defaultProps: { radius: 'lg', size: 'md' } },
     Textarea: { defaultProps: { radius: 'lg', size: 'md' } },
   },
   colors: {
-    green: [
-      '#f0f8f3',
-      '#dceee3',
-      '#badcc8',
-      '#91c5a5',
-      '#67ac82',
-      '#478f65',
-      '#2f6b4f',
-      '#285d45',
-      '#214f3b',
-      '#153326',
+    blue: [
+      '#f1f5f9',
+      '#e3ecf3',
+      '#c9d9e6',
+      '#a9c0d3',
+      '#8ba9c2',
+      '#6d90ae',
+      '#567b9b',
+      '#456681',
+      '#35536c',
+      '#233b51',
     ],
   },
 });
@@ -66,7 +68,7 @@ createRoot(document.getElementById('root')!).render(
       colorSchemeManager={colorSchemeManager}
     >
       <ModalsProvider labels={{ confirm: '确认', cancel: '取消' }}>
-        <Notifications position="bottom-center" limit={3} />
+        <Notifications position="top-center" zIndex={190} limit={3} />
         <HashRouter>
           <App />
         </HashRouter>

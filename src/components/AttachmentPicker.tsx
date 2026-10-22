@@ -37,6 +37,7 @@ export function AttachmentPicker({
   onMove,
   onReturn,
   enableCamera = false,
+  onBusyChange,
 }: {
   files: DraftAttachment[];
   onChange: (files: DraftAttachment[]) => void;
@@ -46,6 +47,7 @@ export function AttachmentPicker({
   onMove?: (attachmentId: string, stepId?: string) => void;
   onReturn?: (attachmentId: string) => void;
   enableCamera?: boolean;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [error, setError] = useState('');
   const [movingId, setMovingId] = useState<string>();
@@ -66,6 +68,12 @@ export function AttachmentPicker({
     };
   }, []);
   const busy = processing || !!cropping;
+  const busyCallback = useRef(onBusyChange);
+  busyCallback.current = onBusyChange;
+  useEffect(() => {
+    busyCallback.current?.(busy);
+    return () => busyCallback.current?.(false);
+  }, [busy]);
 
   async function append(selected: File[]) {
     processingRef.current = true;
@@ -82,6 +90,8 @@ export function AttachmentPicker({
           file,
         })),
       ]);
+    } catch {
+      if (activeRef.current) setError('附件添加失败，请重新选择。');
     } finally {
       processingRef.current = false;
       if (activeRef.current) setProcessing(false);
@@ -93,9 +103,7 @@ export function AttachmentPicker({
     const accepted = selected.filter((file) => !imagesOnly || file.type.startsWith('image/'));
     setError(accepted.length !== selected.length ? '这里只能添加图片，请重新选择。' : '');
     if (!accepted.length) return;
-    const index = accepted.findIndex((file) => file.type.startsWith('image/'));
-    if (index >= 0) setCropping({ selected: accepted, index });
-    else await append(accepted);
+    await append(accepted);
   }
 
   async function edit(attachment: DraftAttachment) {
@@ -136,18 +144,6 @@ export function AttachmentPicker({
           ),
         );
       }
-    } else {
-      const selected = cropping.selected.map((original, index) =>
-        index === cropping.index && file ? file : original,
-      );
-      const index = selected.findIndex(
-        (item, index) => index > cropping.index && item.type.startsWith('image/'),
-      );
-      if (index >= 0) {
-        setCropping({ selected, index });
-        return;
-      }
-      await append(selected);
     }
     if (activeRef.current) setCropping(undefined);
   }
@@ -162,6 +158,8 @@ export function AttachmentPicker({
           {(props) => (
             <Button
               {...props}
+              type="button"
+              mih={44}
               disabled={busy}
               loading={processing}
               variant="light"
@@ -179,15 +177,22 @@ export function AttachmentPicker({
             onChange={(selected) => selected && void pick([selected])}
           >
             {(props) => (
-              <Button {...props} disabled={busy} variant="light" leftSection={<Camera size={18} />}>
-                拍照扫描
+              <Button
+                {...props}
+                type="button"
+                mih={44}
+                disabled={busy}
+                variant="light"
+                leftSection={<Camera size={18} />}
+              >
+                {imagesOnly ? '拍照' : '拍照扫描'}
               </Button>
             )}
           </FileButton>
         )}
       </Group>
       <Text c="dimmed" size="xs">
-        选择照片后可裁剪或使用原图，添加后也可再次裁剪。大图片会在设备上自动压缩，照片不会上传。
+        支持多选，添加后可按需裁剪。照片只保存在本机。
       </Text>
       {!!files.length && (
         <SimpleGrid cols={3} spacing="xs">
@@ -203,7 +208,7 @@ export function AttachmentPicker({
                     )
                   ) : (
                     <Center>
-                      <FileText color="var(--mantine-color-green-7)" />
+                      <FileText color="var(--mantine-color-blue-7)" />
                     </Center>
                   )}
                 </AspectRatio>
@@ -215,6 +220,7 @@ export function AttachmentPicker({
                     type="button"
                     variant="light"
                     size="compact-xs"
+                    mih={44}
                     leftSection={<Crop size={13} />}
                     disabled={busy}
                     aria-label={`裁剪照片 ${index + 1}：${attachment.name}`}
@@ -228,6 +234,7 @@ export function AttachmentPicker({
                     type="button"
                     variant="subtle"
                     size="compact-xs"
+                    mih={44}
                     disabled={busy}
                     onClick={() =>
                       setMovingId(movingId === attachment.id ? undefined : attachment.id)
@@ -273,7 +280,7 @@ export function AttachmentPicker({
                   right={5}
                   variant="filled"
                   color="gray"
-                  size="sm"
+                  size={36}
                   radius="xl"
                   aria-label={`移除图片或文件 ${index + 1}：${attachment.name}`}
                   disabled={busy}

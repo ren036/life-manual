@@ -15,7 +15,6 @@ body,
 }
 
 body {
-  min-width: 320px;
   background: var(--mantine-color-gray-0);
   overscroll-behavior-y: none;
 }

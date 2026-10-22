@@ -3,7 +3,6 @@ import {
   Button,
   Checkbox,
   Collapse,
-  Drawer,
   Fieldset,
   Group,
   MultiSelect,
@@ -27,7 +26,9 @@ import {
   SlidersHorizontal,
   Trash2,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState, type SetStateAction } from 'react';
+import { useEditorDraft } from '../hooks/useEditorDraft';
+import { EditorSheet } from './EditorSheet';
 import { recordAttachments } from '../attachments';
 import { categoryOptions, parseTags } from '../categories';
 import { recognizeDocument } from '../ocr';
@@ -59,6 +60,7 @@ interface Props {
   onSave: (item: SavedItem, files: PendingAttachment[]) => Promise<void>;
   relatedRecordOptions: { value: string; label: string }[];
   defaultRelatedRecord?: RelatedRecordRef;
+  defaultTask?: { title: string; dueDate?: string };
 }
 interface DraftStep {
   id: string;
@@ -79,122 +81,147 @@ function parseIngredients(value: string): string[] {
     .filter(Boolean);
 }
 
-export function AddRecordSheet({
-  open,
+export function AddRecordSheet(props: Props) {
+  return props.open ? (
+    <RecordEditor
+      key={
+        props.mode +
+        ':' +
+        (props.initialItem?.id || 'new') +
+        ':' +
+        (props.defaultRelatedRecord?.id || '')
+      }
+      {...props}
+    />
+  ) : null;
+}
+function initialDraft(
+  initialItem?: SavedItem,
+  defaultRelatedRecord?: RelatedRecordRef,
+  defaultTask?: { title: string; dueDate?: string },
+) {
+  const task = initialItem && 'completed' in initialItem ? initialItem : undefined;
+  const record = initialItem && !('completed' in initialItem) ? initialItem : undefined;
+  return {
+    title: initialItem?.title || defaultTask?.title || '',
+    detail: initialItem
+      ? 'description' in initialItem
+        ? initialItem.description
+        : initialItem.notes
+      : '',
+    category: initialItem?.category || '',
+    ingredients:
+      initialItem && 'ingredients' in initialItem ? initialItem.ingredients.join('\n') : '',
+    tags: (initialItem?.tags || []).join('，'),
+    dueDate: task?.dueDate || defaultTask?.dueDate || '',
+    expiryDate: record && 'expiryDate' in record ? record.expiryDate || '' : '',
+    ocrText: record && 'ocrText' in record ? record.ocrText || '' : '',
+    priority: (task?.priority || '普通') as TaskPriority,
+    repeat: (task?.repeat || '不重复') as TaskRepeat,
+    repeatInterval: task?.repeatInterval || 1,
+    repeatUnit: (task?.repeatUnit || '天') as TaskRepeatUnit,
+    repeatWeekdays: (task?.repeatWeekdays || []).map(String),
+    repeatMonthDay: task ? monthDayForRepeat(task.dueDate || '', task.repeatMonthDay) : 1,
+    repeatEndDate: task?.repeatEndDate || '',
+    overduePolicy: (task?.overduePolicy || '按原计划顺延') as TaskOverduePolicy,
+    important: record && 'important' in record ? record.important : false,
+    favorite: record && 'ingredients' in record ? !!record.favorite : false,
+    relatedRecord: (task?.relatedRecord
+      ? relatedRecordKey(task.relatedRecord)
+      : defaultRelatedRecord
+        ? relatedRecordKey(defaultRelatedRecord)
+        : null) as string | null,
+    files: record ? (recordAttachments(record) as DraftAttachment[]) : ([] as DraftAttachment[]),
+    steps: (record?.steps?.map((step) => ({ ...step, attachments: [...step.attachments] })) ||
+      []) as DraftStep[],
+  };
+}
+function RecordEditor({
   mode,
   initialItem,
   onClose,
   onSave,
   relatedRecordOptions,
   defaultRelatedRecord,
+  defaultTask,
 }: Props) {
-  const [title, setTitle] = useState('');
-  const [detail, setDetail] = useState('');
-  const [category, setCategory] = useState('');
-  const [ingredients, setIngredients] = useState('');
-  const [tags, setTags] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [expiryDate, setExpiryDate] = useState('');
-  const [ocrText, setOcrText] = useState('');
+  const draft = useEditorDraft(
+    mode + ':' + (initialItem?.id || 'new') + ':' + (defaultRelatedRecord?.id || ''),
+    initialDraft(initialItem, defaultRelatedRecord, defaultTask),
+    { initialItem, defaultRelatedRecord, defaultTask },
+  );
+  const {
+    title,
+    detail,
+    category,
+    ingredients,
+    tags,
+    dueDate,
+    expiryDate,
+    ocrText,
+    priority,
+    repeat,
+    repeatInterval,
+    repeatUnit,
+    repeatWeekdays,
+    repeatMonthDay,
+    repeatEndDate,
+    overduePolicy,
+    important,
+    favorite,
+    relatedRecord,
+    files,
+    steps,
+  } = draft.value;
+  const setTitle = (next: SetStateAction<typeof title>) => draft.setField('title', next);
+  const setDetail = (next: SetStateAction<typeof detail>) => draft.setField('detail', next);
+  const setCategory = (next: SetStateAction<typeof category>) => draft.setField('category', next);
+  const setIngredients = (next: SetStateAction<typeof ingredients>) =>
+    draft.setField('ingredients', next);
+  const setTags = (next: SetStateAction<typeof tags>) => draft.setField('tags', next);
+  const setDueDate = (next: SetStateAction<typeof dueDate>) => draft.setField('dueDate', next);
+  const setExpiryDate = (next: SetStateAction<typeof expiryDate>) =>
+    draft.setField('expiryDate', next);
+  const setOcrText = (next: SetStateAction<typeof ocrText>) => draft.setField('ocrText', next);
+  const setPriority = (next: SetStateAction<typeof priority>) => draft.setField('priority', next);
+  const setRepeat = (next: SetStateAction<typeof repeat>) => draft.setField('repeat', next);
+  const setRepeatInterval = (next: SetStateAction<typeof repeatInterval>) =>
+    draft.setField('repeatInterval', next);
+  const setRepeatUnit = (next: SetStateAction<typeof repeatUnit>) =>
+    draft.setField('repeatUnit', next);
+  const setRepeatWeekdays = (next: SetStateAction<typeof repeatWeekdays>) =>
+    draft.setField('repeatWeekdays', next);
+  const setRepeatMonthDay = (next: SetStateAction<typeof repeatMonthDay>) =>
+    draft.setField('repeatMonthDay', next);
+  const setRepeatEndDate = (next: SetStateAction<typeof repeatEndDate>) =>
+    draft.setField('repeatEndDate', next);
+  const setOverduePolicy = (next: SetStateAction<typeof overduePolicy>) =>
+    draft.setField('overduePolicy', next);
+  const setImportant = (next: SetStateAction<typeof important>) =>
+    draft.setField('important', next);
+  const setFavorite = (next: SetStateAction<typeof favorite>) => draft.setField('favorite', next);
+  const setRelatedRecord = (next: SetStateAction<typeof relatedRecord>) =>
+    draft.setField('relatedRecord', next);
+  const setFiles = (next: SetStateAction<typeof files>) => draft.setField('files', next);
+  const setSteps = (next: SetStateAction<typeof steps>) => draft.setField('steps', next);
   const [ocrRunning, setOcrRunning] = useState(false);
   const [ocrProgress, setOcrProgress] = useState(0);
-  const [priority, setPriority] = useState<TaskPriority>('普通');
-  const [repeat, setRepeat] = useState<TaskRepeat>('不重复');
-  const [repeatInterval, setRepeatInterval] = useState(1);
-  const [repeatUnit, setRepeatUnit] = useState<TaskRepeatUnit>('天');
-  const [repeatWeekdays, setRepeatWeekdays] = useState<string[]>([]);
-  const [repeatMonthDay, setRepeatMonthDay] = useState(1);
-  const [repeatEndDate, setRepeatEndDate] = useState('');
-  const [overduePolicy, setOverduePolicy] = useState<TaskOverduePolicy>('按原计划顺延');
-  const [important, setImportant] = useState(false);
-  const [favorite, setFavorite] = useState(false);
-  const [relatedRecord, setRelatedRecord] = useState<string | null>(null);
-  const [files, setFiles] = useState<DraftAttachment[]>([]);
-  const [steps, setSteps] = useState<DraftStep[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [stepsOpen, setStepsOpen] = useState(false);
+  const [busyPickers, setBusyPickers] = useState<Set<string>>(new Set());
   const savingRef = useRef(false);
-  useEffect(() => {
-    setTitle(initialItem?.title || '');
-    setDetail(
-      initialItem
-        ? 'ingredients' in initialItem
-          ? initialItem.notes
-          : 'description' in initialItem
-            ? initialItem.description
-            : initialItem.notes
-        : '',
-    );
-    setCategory(initialItem?.category || '');
-    setIngredients(
-      initialItem && 'ingredients' in initialItem ? initialItem.ingredients.join('\n') : '',
-    );
-    setTags(initialItem ? (initialItem.tags || []).join('，') : '');
-    setDueDate(initialItem && 'completed' in initialItem ? initialItem.dueDate || '' : '');
-    setExpiryDate(initialItem && 'description' in initialItem ? initialItem.expiryDate || '' : '');
-    setOcrText(initialItem && 'description' in initialItem ? initialItem.ocrText || '' : '');
-    setOcrRunning(false);
-    setOcrProgress(0);
-    setPriority(initialItem && 'completed' in initialItem ? initialItem.priority : '普通');
-    setRepeat(
-      initialItem && 'completed' in initialItem ? initialItem.repeat || '不重复' : '不重复',
-    );
-    setRepeatInterval(
-      initialItem && 'completed' in initialItem ? initialItem.repeatInterval || 1 : 1,
-    );
-    setRepeatUnit(
-      initialItem && 'completed' in initialItem ? initialItem.repeatUnit || '天' : '天',
-    );
-    setRepeatWeekdays(
-      initialItem && 'completed' in initialItem
-        ? (initialItem.repeatWeekdays || []).map(String)
-        : [],
-    );
-    const initialDueDate =
-      initialItem && 'completed' in initialItem ? initialItem.dueDate || '' : '';
-    setRepeatMonthDay(
-      initialItem && 'completed' in initialItem
-        ? monthDayForRepeat(initialDueDate, initialItem.repeatMonthDay)
-        : 1,
-    );
-    setRepeatEndDate(
-      initialItem && 'completed' in initialItem ? initialItem.repeatEndDate || '' : '',
-    );
-    setOverduePolicy(
-      initialItem && 'completed' in initialItem
-        ? initialItem.overduePolicy || '按原计划顺延'
-        : '按原计划顺延',
-    );
-    setImportant(initialItem && 'important' in initialItem ? initialItem.important : false);
-    setFavorite(initialItem && 'ingredients' in initialItem ? !!initialItem.favorite : false);
-    setRelatedRecord(
-      initialItem && 'completed' in initialItem && initialItem.relatedRecord
-        ? relatedRecordKey(initialItem.relatedRecord)
-        : defaultRelatedRecord
-          ? relatedRecordKey(defaultRelatedRecord)
-          : null,
-    );
-    setFiles(initialItem && !('completed' in initialItem) ? recordAttachments(initialItem) : []);
-    setSteps(
-      initialItem && !('completed' in initialItem)
-        ? initialItem.steps?.map((step) => ({ ...step, attachments: [...step.attachments] })) || []
-        : [],
-    );
-    setError('');
-    setAdvancedOpen(!!initialItem || !!defaultRelatedRecord);
-    setStepsOpen(!!(initialItem && !('completed' in initialItem) && initialItem.steps?.length));
-  }, [mode, open, initialItem, defaultRelatedRecord]);
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
-  if (!open) return null;
+  const attachmentBusy = busyPickers.size > 0;
+  function pickerBusy(key: string, busy: boolean) {
+    setBusyPickers((current) => {
+      if (current.has(key) === busy) return current;
+      const next = new Set(current);
+      if (busy) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
   function moveStep(index: number, direction: number) {
     setSteps((current) => {
       const next = [...current];
@@ -254,7 +281,7 @@ export function AddRecordSheet({
     }
   }
   async function submit() {
-    if (!title.trim() || savingRef.current) return;
+    if (!title.trim() || savingRef.current || attachmentBusy || !draft.ready) return;
     if (mode === 'tasks' && repeat !== '不重复' && !dueDate) {
       setError('重复待办需要设置首次截止日期。');
       return;
@@ -347,6 +374,7 @@ export function AddRecordSheet({
         (attachment): attachment is PendingAttachment => !!attachment.file,
       );
       await onSave(item, mode === 'tasks' ? [] : newFiles);
+      await draft.complete();
     } catch {
       setError('保存失败，内容已保留。请检查设备存储空间后重试。');
     } finally {
@@ -355,15 +383,18 @@ export function AddRecordSheet({
     }
   }
   const close = () => {
-    if (!savingRef.current && !ocrRunning) onClose();
+    if (!savingRef.current && !ocrRunning && !attachmentBusy && draft.ready)
+      void draft.close(onClose);
   };
   return (
-    <Drawer
-      opened={open}
+    <EditorSheet
+      draft={draft}
+      onSave={() => void submit()}
+      saveLabel={initialItem ? '保存修改' : '保存'}
+      canSave={!!title.trim() && !attachmentBusy}
+      busy={saving || ocrRunning || attachmentBusy}
+      error={error}
       onClose={close}
-      position="bottom"
-      size="92vh"
-      radius="xl"
       title={
         <Stack gap={0}>
           <Title order={3} id="add-title">
@@ -376,413 +407,438 @@ export function AddRecordSheet({
               : labels[mode]}
           </Title>
           <Text c="dimmed" size="xs">
-            {mode === 'tasks' ? '把要做的事从脑子里拿出来' : '用图片和步骤，把细节记清楚'}
+            {mode === 'tasks'
+              ? '先记下，之后再安排'
+              : mode === 'documents'
+                ? '名称和说明先保存，文件可以稍后补充'
+                : '先记菜名，照片和做法可以慢慢补充'}
           </Text>
         </Stack>
       }
-      closeButtonProps={{ disabled: saving || ocrRunning, 'aria-label': '关闭' }}
-      overlayProps={{ backgroundOpacity: 0.42, blur: 3 }}
     >
-      <form
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submit();
-        }}
-      >
-        <Fieldset disabled={saving || ocrRunning} variant="unstyled">
-          <Stack gap="md">
+      <Fieldset disabled={saving || ocrRunning || !draft.ready} variant="unstyled">
+        <Stack gap="md">
+          <TextInput
+            data-autofocus={mode === 'tasks' ? true : undefined}
+            required
+            label={mode === 'recipes' ? '菜名' : mode === 'documents' ? '资料名称' : '要做什么'}
+            value={title}
+            onChange={(e) => setTitle(e.currentTarget.value)}
+            placeholder={
+              mode === 'recipes'
+                ? '例如：番茄炒蛋'
+                : mode === 'documents'
+                  ? '例如：冰箱电子发票'
+                  : '例如：预约洗牙'
+            }
+            radius="md"
+          />
+          {mode !== 'tasks' && (
+            <AttachmentPicker
+              files={files}
+              onBusyChange={(busy) => pickerBusy('main', busy)}
+              onChange={(next) => {
+                setFiles(next);
+                if (mode === 'documents' && !title.trim() && next[0]) {
+                  const filename = next[0].name.replace(/\.[^.]+$/, '');
+                  setTitle(
+                    /^(IMG_|DSC|image|photo|capture)/i.test(filename)
+                      ? '照片资料 · ' +
+                          new Intl.DateTimeFormat('zh-CN', {
+                            month: 'long',
+                            day: 'numeric',
+                          }).format(new Date())
+                      : filename,
+                  );
+                }
+              }}
+              destinations={steps.map((step, index) => ({
+                id: step.id,
+                label:
+                  '步骤 ' +
+                  (index + 1) +
+                  (step.text.trim() ? '：' + step.text.trim().slice(0, 20) : ''),
+              }))}
+              onMove={moveAttachmentToStep}
+              imagesOnly={mode === 'recipes'}
+              enableCamera
+              label={mode === 'recipes' ? '添加照片' : '图片或文件'}
+            />
+          )}
+
+          {mode === 'tasks' && (
             <TextInput
-              autoFocus
-              required
-              label={mode === 'recipes' ? '菜名' : mode === 'documents' ? '资料名称' : '要做什么'}
-              value={title}
-              onChange={(e) => setTitle(e.currentTarget.value)}
-              placeholder={
-                mode === 'recipes'
-                  ? '例如：番茄炒蛋'
-                  : mode === 'documents'
-                    ? '例如：冰箱电子发票'
-                    : '例如：预约洗牙'
-              }
+              type="date"
+              label="截止日期（可选）"
+              value={dueDate}
+              onInput={(e) => {
+                const value = e.currentTarget.value;
+                setDueDate(value);
+                if (value) setRepeatMonthDay(monthDayForRepeat(value));
+              }}
+              onChange={(e) => {
+                const value = e.currentTarget.value;
+                setDueDate(value);
+                if (value) setRepeatMonthDay(monthDayForRepeat(value));
+              }}
               radius="md"
             />
-            {mode === 'recipes' && (
-              <Textarea
-                label="食材"
-                value={ingredients}
-                onChange={(e) => setIngredients(e.currentTarget.value)}
-                placeholder={'一行一种，例如：\n鸡蛋 2 个\n番茄 300 克'}
-                description="一行一种食材，用量和单位会完整保留"
-                autosize
-                minRows={3}
-                radius="md"
+          )}
+          <Textarea
+            label={mode === 'tasks' ? '备注' : mode === 'recipes' ? '心得与备注' : '说明'}
+            value={detail}
+            onChange={(e) => setDetail(e.currentTarget.value)}
+            placeholder="可以先简单记几句"
+            minRows={3}
+            autosize
+            radius="md"
+          />
+          <Button
+            type="button"
+            variant="light"
+            color="gray"
+            leftSection={<SlidersHorizontal size={17} />}
+            rightSection={
+              <ChevronDown
+                size={17}
+                style={{ transform: advancedOpen ? 'rotate(180deg)' : undefined }}
               />
-            )}
-            {mode === 'documents' && (
-              <TextInput
-                type="date"
-                label="到期日期或保修期（可选）"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.currentTarget.value)}
-                radius="md"
-              />
-            )}
-            {mode === 'tasks' && (
-              <TextInput
-                type="date"
-                label="截止日期（可选）"
-                value={dueDate}
-                onChange={(e) => {
-                  const value = e.currentTarget.value;
-                  setDueDate(value);
-                  if (value) setRepeatMonthDay(monthDayForRepeat(value));
-                }}
-                radius="md"
-              />
-            )}
-            <Textarea
-              label={mode === 'tasks' ? '备注' : mode === 'recipes' ? '心得与备注' : '说明'}
-              value={detail}
-              onChange={(e) => setDetail(e.currentTarget.value)}
-              placeholder="可以先简单记几句"
-              minRows={3}
-              autosize
-              radius="md"
-            />
-            <Button
-              type="button"
-              variant="light"
-              color="gray"
-              leftSection={<SlidersHorizontal size={17} />}
-              rightSection={
-                <ChevronDown
-                  size={17}
-                  style={{ transform: advancedOpen ? 'rotate(180deg)' : undefined }}
-                />
-              }
-              justify="space-between"
-              onClick={() => setAdvancedOpen((value) => !value)}
-              aria-expanded={advancedOpen}
-            >
-              更多设置
-            </Button>
-            <Collapse expanded={advancedOpen}>
-              <Paper withBorder radius="lg" p="md">
-                <Stack gap="md">
-                  <Select
-                    label="分类"
-                    value={category}
-                    onChange={(value) => setCategory(value || '')}
-                    data={categoryOptions(mode, category)}
-                    placeholder="选择分类"
-                    searchable
-                    allowDeselect={false}
+            }
+            justify="space-between"
+            onClick={() => setAdvancedOpen((value) => !value)}
+            aria-expanded={advancedOpen}
+          >
+            更多设置
+          </Button>
+          {!advancedOpen && (
+            <Text size="xs" c="dimmed">
+              {[
+                category || (mode === 'recipes' ? '家常菜' : mode === 'tasks' ? '生活' : '其他'),
+                tags && '标签：' + tags,
+                favorite && '已收藏',
+                important && '重要资料',
+                mode === 'recipes' && ingredients && '已填食材',
+                expiryDate && '到期：' + expiryDate,
+                mode === 'tasks' && priority !== '普通' && priority,
+                repeat !== '不重复' && repeat,
+                relatedRecord && '已关联内容',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          )}
+          <Collapse expanded={advancedOpen}>
+            <Paper withBorder radius="lg" p="md">
+              <Stack gap="md">
+                {mode === 'recipes' && (
+                  <Textarea
+                    label="食材"
+                    value={ingredients}
+                    onChange={(e) => setIngredients(e.currentTarget.value)}
+                    placeholder={'一行一种，例如：\n鸡蛋 2 个\n番茄 300 克'}
+                    description="一行一种食材，用量和单位会完整保留"
+                    autosize
+                    minRows={3}
                     radius="md"
                   />
+                )}
+                {mode === 'documents' && (
                   <TextInput
-                    label="标签（可选）"
-                    value={tags}
-                    onChange={(e) => setTags(e.currentTarget.value)}
-                    placeholder="用逗号分开，例如：孩子、常用、2026"
+                    type="date"
+                    label="到期日期或保修期（可选）"
+                    value={expiryDate}
+                    onInput={(e) => setExpiryDate(e.currentTarget.value)}
+                    onChange={(e) => setExpiryDate(e.currentTarget.value)}
                     radius="md"
                   />
-                  {mode === 'tasks' && (
-                    <>
-                      <Select
-                        label="关联菜谱或资料（可选）"
-                        placeholder="选择关联内容"
-                        value={relatedRecord}
-                        onChange={setRelatedRecord}
-                        data={relatedRecordOptions}
-                        searchable
-                        clearable
+                )}
+                <Select
+                  label="分类"
+                  value={category}
+                  onChange={(value) => setCategory(value || '')}
+                  data={categoryOptions(mode, category)}
+                  placeholder="选择分类"
+                  searchable
+                  allowDeselect={false}
+                  radius="md"
+                />
+                <TextInput
+                  label="标签（可选）"
+                  value={tags}
+                  onChange={(e) => setTags(e.currentTarget.value)}
+                  placeholder="用逗号分开，例如：孩子、常用、2026"
+                  radius="md"
+                />
+                {mode === 'tasks' && (
+                  <>
+                    <Select
+                      label="关联菜谱或资料（可选）"
+                      placeholder="选择关联内容"
+                      value={relatedRecord}
+                      onChange={setRelatedRecord}
+                      data={relatedRecordOptions}
+                      searchable
+                      clearable
+                    />
+                    <Fieldset legend="优先级" variant="unstyled">
+                      <SegmentedControl
+                        fullWidth
+                        color="blue"
+                        value={priority}
+                        onChange={(value) => setPriority(value as TaskPriority)}
+                        data={['普通', '重要', '紧急']}
                       />
-                      <Fieldset legend="优先级" variant="unstyled">
-                        <SegmentedControl
-                          fullWidth
-                          color="green"
-                          value={priority}
-                          onChange={(value) => setPriority(value as TaskPriority)}
-                          data={['普通', '重要', '紧急']}
-                        />
-                      </Fieldset>
-                      <Select
-                        label="重复方式"
-                        value={repeat}
-                        onChange={(value) => {
-                          const nextRepeat = (value || '不重复') as TaskRepeat;
-                          setRepeat(nextRepeat);
-                          if (nextRepeat === '每月' && dueDate)
-                            setRepeatMonthDay(monthDayForRepeat(dueDate));
-                        }}
-                        data={['不重复', '每天', '每周', '每月', '自定义']}
-                        allowDeselect={false}
-                        radius="md"
-                      />
-                      {repeat === '自定义' && (
-                        <Group grow align="flex-start">
-                          <NumberInput
-                            label="间隔"
-                            value={repeatInterval}
-                            onChange={(value) => setRepeatInterval(Math.max(1, Number(value) || 1))}
-                            min={1}
-                            max={365}
-                            allowDecimal={false}
-                          />
-                          <Select
-                            label="周期单位"
-                            value={repeatUnit}
-                            onChange={(value) => setRepeatUnit((value || '天') as TaskRepeatUnit)}
-                            data={['天', '周', '月']}
-                            allowDeselect={false}
-                          />
-                        </Group>
-                      )}
-                      {(repeat === '每周' || (repeat === '自定义' && repeatUnit === '周')) && (
-                        <MultiSelect
-                          label="在星期几重复"
-                          description="不选择时沿用首次截止日期的星期"
-                          value={repeatWeekdays}
-                          onChange={setRepeatWeekdays}
-                          data={[
-                            { value: '1', label: '周一' },
-                            { value: '2', label: '周二' },
-                            { value: '3', label: '周三' },
-                            { value: '4', label: '周四' },
-                            { value: '5', label: '周五' },
-                            { value: '6', label: '周六' },
-                            { value: '0', label: '周日' },
-                          ]}
-                        />
-                      )}
-                      {(repeat === '每月' || (repeat === '自定义' && repeatUnit === '月')) && (
+                    </Fieldset>
+                    <Select
+                      label="重复方式"
+                      value={repeat}
+                      onChange={(value) => {
+                        const nextRepeat = (value || '不重复') as TaskRepeat;
+                        setRepeat(nextRepeat);
+                        if (nextRepeat === '每月' && dueDate)
+                          setRepeatMonthDay(monthDayForRepeat(dueDate));
+                      }}
+                      data={['不重复', '每天', '每周', '每月', '自定义']}
+                      allowDeselect={false}
+                      radius="md"
+                    />
+                    {repeat === '自定义' && (
+                      <Group grow align="flex-start">
                         <NumberInput
-                          label="每月日期"
-                          description="月份天数不足时使用当月最后一天"
-                          value={repeatMonthDay}
-                          onChange={(value) =>
-                            setRepeatMonthDay(Math.min(31, Math.max(1, Number(value) || 1)))
-                          }
+                          label="间隔"
+                          value={repeatInterval}
+                          onChange={(value) => setRepeatInterval(Math.max(1, Number(value) || 1))}
                           min={1}
-                          max={31}
+                          max={365}
                           allowDecimal={false}
                         />
-                      )}
-                      {repeat !== '不重复' && (
-                        <>
-                          <TextInput
-                            type="date"
-                            label="重复结束日期（可选）"
-                            value={repeatEndDate}
-                            onChange={(event) => setRepeatEndDate(event.currentTarget.value)}
-                            min={dueDate || undefined}
-                          />
-                          <Select
-                            label="逾期后的下一次"
-                            value={overduePolicy}
-                            onChange={(value) =>
-                              setOverduePolicy((value || '按原计划顺延') as TaskOverduePolicy)
-                            }
-                            data={['按原计划顺延', '从完成日期顺延']}
-                            allowDeselect={false}
-                          />
-                        </>
-                      )}
-                    </>
-                  )}
-                  {mode === 'recipes' && (
-                    <Checkbox
-                      checked={favorite}
-                      onChange={(e) => setFavorite(e.currentTarget.checked)}
-                      label="收藏这道菜"
-                      radius="sm"
-                    />
-                  )}
-                  {mode === 'documents' && (
-                    <Checkbox
-                      checked={important}
-                      onChange={(e) => setImportant(e.currentTarget.checked)}
-                      label="标记为重要资料"
-                      radius="sm"
-                    />
-                  )}
-                </Stack>
-              </Paper>
-            </Collapse>
-            {mode !== 'tasks' && (
-              <>
-                <AttachmentPicker
-                  files={files}
-                  onChange={setFiles}
-                  destinations={steps.map((step, index) => ({
-                    id: step.id,
-                    label:
-                      '步骤 ' +
-                      (index + 1) +
-                      (step.text.trim() ? '：' + step.text.trim().slice(0, 20) : ''),
-                  }))}
-                  onMove={moveAttachmentToStep}
-                  imagesOnly={mode === 'recipes'}
-                  enableCamera={mode === 'documents'}
-                  label={mode === 'recipes' ? '添加成品照片（可多选）' : '添加图片或文件（可多选）'}
-                />
+                        <Select
+                          label="周期单位"
+                          value={repeatUnit}
+                          onChange={(value) => setRepeatUnit((value || '天') as TaskRepeatUnit)}
+                          data={['天', '周', '月']}
+                          allowDeselect={false}
+                        />
+                      </Group>
+                    )}
+                    {(repeat === '每周' || (repeat === '自定义' && repeatUnit === '周')) && (
+                      <MultiSelect
+                        label="在星期几重复"
+                        description="不选择时沿用首次截止日期的星期"
+                        value={repeatWeekdays}
+                        onChange={setRepeatWeekdays}
+                        data={[
+                          { value: '1', label: '周一' },
+                          { value: '2', label: '周二' },
+                          { value: '3', label: '周三' },
+                          { value: '4', label: '周四' },
+                          { value: '5', label: '周五' },
+                          { value: '6', label: '周六' },
+                          { value: '0', label: '周日' },
+                        ]}
+                      />
+                    )}
+                    {(repeat === '每月' || (repeat === '自定义' && repeatUnit === '月')) && (
+                      <NumberInput
+                        label="每月日期"
+                        description="月份天数不足时使用当月最后一天"
+                        value={repeatMonthDay}
+                        onChange={(value) =>
+                          setRepeatMonthDay(Math.min(31, Math.max(1, Number(value) || 1)))
+                        }
+                        min={1}
+                        max={31}
+                        allowDecimal={false}
+                      />
+                    )}
+                    {repeat !== '不重复' && (
+                      <>
+                        <TextInput
+                          type="date"
+                          label="重复结束日期（可选）"
+                          value={repeatEndDate}
+                          onInput={(event) => setRepeatEndDate(event.currentTarget.value)}
+                          onChange={(event) => setRepeatEndDate(event.currentTarget.value)}
+                          min={dueDate || undefined}
+                        />
+                        <Select
+                          label="逾期后的下一次"
+                          value={overduePolicy}
+                          onChange={(value) =>
+                            setOverduePolicy((value || '按原计划顺延') as TaskOverduePolicy)
+                          }
+                          data={['按原计划顺延', '从完成日期顺延']}
+                          allowDeselect={false}
+                        />
+                      </>
+                    )}
+                  </>
+                )}
+                {mode === 'recipes' && (
+                  <Checkbox
+                    checked={favorite}
+                    onChange={(e) => setFavorite(e.currentTarget.checked)}
+                    label="收藏这道菜"
+                    radius="sm"
+                  />
+                )}
                 {mode === 'documents' && (
-                  <Paper withBorder radius="lg" p="md">
-                    <Stack gap="sm">
-                      <Button
-                        type="button"
-                        variant="light"
-                        leftSection={<ScanText size={18} />}
-                        loading={ocrRunning}
-                        disabled={!files.some((file) => file.type.startsWith('image/'))}
-                        onClick={() => void runOcr()}
-                      >
-                        识别首张图片文字
-                      </Button>
-                      {ocrRunning && (
-                        <Progress
-                          value={Math.round(ocrProgress * 100)}
-                          animated
-                          aria-label={`文字识别进度 ${Math.round(ocrProgress * 100)}%`}
-                        />
-                      )}
-                      <Text c="dimmed" size="xs">
-                        首次识别会加载本地中文模型，之后可离线使用；图片不会上传。
-                      </Text>
-                      {(ocrText || ocrRunning) && (
-                        <Textarea
-                          label="识别文字（可编辑，会参与搜索）"
-                          value={ocrText}
-                          onChange={(event) => setOcrText(event.currentTarget.value)}
-                          minRows={5}
-                          autosize
-                        />
-                      )}
-                    </Stack>
-                  </Paper>
+                  <Checkbox
+                    checked={important}
+                    onChange={(e) => setImportant(e.currentTarget.checked)}
+                    label="标记为重要资料"
+                    radius="sm"
+                  />
                 )}
-                {!stepsOpen && !steps.length && (
-                  <Button
-                    type="button"
-                    variant="subtle"
-                    leftSection={<Plus size={18} />}
-                    onClick={() => setStepsOpen(true)}
-                  >
-                    {mode === 'recipes' ? '添加制作步骤（可选）' : '添加操作步骤（可选）'}
-                  </Button>
-                )}
-                <Collapse expanded={stepsOpen || !!steps.length}>
-                  <Stack component="section" gap="md" aria-label="步骤编辑">
-                    <Group justify="space-between">
-                      <Title order={3}>
-                        {mode === 'recipes' ? '制作步骤' : '操作步骤'}（可选）
-                      </Title>
-                      <Text c="dimmed" size="xs">
-                        {steps.length} 步
-                      </Text>
-                    </Group>
-                    {steps.map((step, index) => (
-                      <Paper withBorder radius="lg" p="md" key={step.id}>
-                        <Stack gap="md">
-                          <Group justify="space-between">
-                            <Text fw={700}>步骤 {index + 1}</Text>
-                            <Group gap={5}>
-                              <ActionIcon
-                                type="button"
-                                variant="default"
-                                disabled={index === 0}
-                                aria-label={`上移步骤 ${index + 1}`}
-                                onClick={() => moveStep(index, -1)}
-                              >
-                                <ArrowUp size={17} />
-                              </ActionIcon>
-                              <ActionIcon
-                                type="button"
-                                variant="default"
-                                disabled={index === steps.length - 1}
-                                aria-label={`下移步骤 ${index + 1}`}
-                                onClick={() => moveStep(index, 1)}
-                              >
-                                <ArrowDown size={17} />
-                              </ActionIcon>
-                              <ActionIcon
-                                type="button"
-                                variant="light"
-                                color="red"
-                                aria-label={`删除步骤 ${index + 1}`}
-                                onClick={() =>
-                                  setSteps(steps.filter((item) => item.id !== step.id))
-                                }
-                              >
-                                <Trash2 size={17} />
-                              </ActionIcon>
-                            </Group>
-                          </Group>
-                          <Textarea
-                            label={`步骤 ${index + 1} 说明`}
-                            value={step.text}
-                            onChange={(e) =>
-                              setSteps(
-                                steps.map((item) =>
-                                  item.id === step.id
-                                    ? { ...item, text: e.currentTarget.value }
-                                    : item,
-                                ),
-                              )
-                            }
-                            placeholder="这一步要做什么？可以记下时间、用量和小技巧"
-                            autosize
-                            minRows={3}
-                            radius="md"
-                          />
-                          <AttachmentPicker
-                            files={step.attachments}
-                            imagesOnly={mode === 'recipes'}
-                            label={`添加步骤 ${index + 1} ${mode === 'recipes' ? '图片' : '图片或文件'}（可多选）`}
-                            onReturn={(attachmentId) => returnAttachment(step.id, attachmentId)}
-                            onChange={(attachments) =>
-                              setSteps(
-                                steps.map((item) =>
-                                  item.id === step.id ? { ...item, attachments } : item,
-                                ),
-                              )
-                            }
-                          />
-                        </Stack>
-                      </Paper>
-                    ))}
+              </Stack>
+            </Paper>
+          </Collapse>
+          {mode !== 'tasks' && (
+            <>
+              {mode === 'documents' && (
+                <Paper withBorder radius="lg" p="md">
+                  <Stack gap="sm">
                     <Button
                       type="button"
                       variant="light"
-                      leftSection={<Plus size={18} />}
-                      onClick={() =>
-                        setSteps([...steps, { id: crypto.randomUUID(), text: '', attachments: [] }])
-                      }
+                      leftSection={<ScanText size={18} />}
+                      loading={ocrRunning}
+                      disabled={!files.some((file) => file.type.startsWith('image/'))}
+                      onClick={() => void runOcr()}
                     >
-                      添加步骤
+                      识别首张图片文字
                     </Button>
+                    {ocrRunning && (
+                      <Progress
+                        value={Math.round(ocrProgress * 100)}
+                        animated
+                        aria-label={`文字识别进度 ${Math.round(ocrProgress * 100)}%`}
+                      />
+                    )}
+                    <Text c="dimmed" size="xs">
+                      首次识别会加载本地中文模型，之后可离线使用；图片不会上传。
+                    </Text>
+                    {(ocrText || ocrRunning) && (
+                      <Textarea
+                        label="识别文字（可编辑，会参与搜索）"
+                        value={ocrText}
+                        onChange={(event) => setOcrText(event.currentTarget.value)}
+                        minRows={5}
+                        autosize
+                      />
+                    )}
                   </Stack>
-                </Collapse>
-              </>
-            )}
-            {error && (
-              <Text c="red" size="sm" role="alert">
-                {error}
-              </Text>
-            )}
-            <Button
-              type="submit"
-              fullWidth
-              size="md"
-              radius="md"
-              loading={saving}
-              disabled={!title.trim() || ocrRunning}
-            >
-              {initialItem ? '保存修改' : '保存'}
-            </Button>
-          </Stack>
-        </Fieldset>
-      </form>
-    </Drawer>
+                </Paper>
+              )}
+              {!stepsOpen && !steps.length && (
+                <Button
+                  type="button"
+                  variant="subtle"
+                  leftSection={<Plus size={18} />}
+                  onClick={() => {
+                    setStepsOpen(true);
+                    setSteps([{ id: crypto.randomUUID(), text: '', attachments: [] }]);
+                  }}
+                >
+                  {mode === 'recipes' ? '添加制作步骤（可选）' : '添加操作步骤（可选）'}
+                </Button>
+              )}
+              <Collapse expanded={stepsOpen || !!steps.length}>
+                <Stack component="section" gap="md" aria-label="步骤编辑">
+                  <Group justify="space-between">
+                    <Title order={3}>{mode === 'recipes' ? '制作步骤' : '操作步骤'}（可选）</Title>
+                    <Text c="dimmed" size="xs">
+                      {steps.length} 步
+                    </Text>
+                  </Group>
+                  {steps.map((step, index) => (
+                    <Paper withBorder radius="lg" p="md" key={step.id}>
+                      <Stack gap="md">
+                        <Group justify="space-between">
+                          <Text fw={700}>步骤 {index + 1}</Text>
+                          <Group gap={5}>
+                            <ActionIcon
+                              size={44}
+                              type="button"
+                              variant="default"
+                              disabled={index === 0}
+                              aria-label={`上移步骤 ${index + 1}`}
+                              onClick={() => moveStep(index, -1)}
+                            >
+                              <ArrowUp size={17} />
+                            </ActionIcon>
+                            <ActionIcon
+                              size={44}
+                              type="button"
+                              variant="default"
+                              disabled={index === steps.length - 1}
+                              aria-label={`下移步骤 ${index + 1}`}
+                              onClick={() => moveStep(index, 1)}
+                            >
+                              <ArrowDown size={17} />
+                            </ActionIcon>
+                            <ActionIcon
+                              size={44}
+                              type="button"
+                              variant="light"
+                              color="red"
+                              aria-label={`删除步骤 ${index + 1}`}
+                              onClick={() => setSteps(steps.filter((item) => item.id !== step.id))}
+                            >
+                              <Trash2 size={17} />
+                            </ActionIcon>
+                          </Group>
+                        </Group>
+                        <Textarea
+                          label={`步骤 ${index + 1} 说明`}
+                          value={step.text}
+                          onChange={(e) =>
+                            setSteps(
+                              steps.map((item) =>
+                                item.id === step.id
+                                  ? { ...item, text: e.currentTarget.value }
+                                  : item,
+                              ),
+                            )
+                          }
+                          placeholder="这一步要做什么？可以记下时间、用量和小技巧"
+                          autosize
+                          minRows={3}
+                          radius="md"
+                        />
+                        <AttachmentPicker
+                          files={step.attachments}
+                          onBusyChange={(busy) => pickerBusy(step.id, busy)}
+                          imagesOnly={mode === 'recipes'}
+                          label={`添加步骤 ${index + 1} ${mode === 'recipes' ? '图片' : '图片或文件'}（可多选）`}
+                          onReturn={(attachmentId) => returnAttachment(step.id, attachmentId)}
+                          onChange={(attachments) =>
+                            setSteps(
+                              steps.map((item) =>
+                                item.id === step.id ? { ...item, attachments } : item,
+                              ),
+                            )
+                          }
+                        />
+                      </Stack>
+                    </Paper>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="light"
+                    leftSection={<Plus size={18} />}
+                    onClick={() =>
+                      setSteps([...steps, { id: crypto.randomUUID(), text: '', attachments: [] }])
+                    }
+                  >
+                    添加步骤
+                  </Button>
+                </Stack>
+              </Collapse>
+            </>
+          )}
+        </Stack>
+      </Fieldset>
+    </EditorSheet>
   );
 }

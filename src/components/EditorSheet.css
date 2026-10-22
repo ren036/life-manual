@@ -1,0 +1,35 @@
+.mantine-Drawer-content.editor-sheet {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--mantine-radius-xl) var(--mantine-radius-xl) 0 0;
+}
+
+.editor-sheet__header {
+  flex-shrink: 0;
+}
+.mantine-Drawer-body.editor-sheet__body,
+.editor-sheet__form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.editor-sheet__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 4px var(--mantine-spacing-md) var(--mantine-spacing-md);
+  scroll-padding-block: 12px;
+}
+
+.editor-sheet__footer {
+  flex-shrink: 0;
+  padding: 6px var(--mantine-spacing-md) max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--mantine-color-default-border);
+  background: var(--app-surface);
+}

@@ -1,6 +1,6 @@
 import {
   Button,
-  Drawer,
+  Fieldset,
   Group,
   SegmentedControl,
   Stack,
@@ -8,9 +8,11 @@ import {
   Textarea,
   TextInput,
 } from '@mantine/core';
-import { Mic, MicOff, Save, Sparkles, Trash2 } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Mood, NoteEntry, PendingAttachment } from '../types';
+import { useEditorDraft } from '../hooks/useEditorDraft';
+import { EditorSheet } from './EditorSheet';
 
 interface SpeechResultEvent extends Event {
   resultIndex: number;
@@ -34,21 +36,34 @@ type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
 const moodData = ['😄 开心', '😌 平静', '😔 低落', '😟 焦虑', '😤 生气'];
 const moodFromLabel = (value: string) => value.slice(3) as Mood;
 
-export function NoteSheet({
-  open,
-  initialNote,
-  onClose,
-  onSave,
-}: {
+interface Props {
   open: boolean;
   initialNote?: NoteEntry;
   onClose: () => void;
   onSave: (note: NoteEntry, audio?: PendingAttachment) => Promise<void>;
-}) {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [mood, setMood] = useState<Mood>('平静');
-  const [audio, setAudio] = useState<PendingAttachment>();
+}
+export function NoteSheet(props: Props) {
+  return props.open ? <NoteEditor key={props.initialNote?.id || 'new'} {...props} /> : null;
+}
+function NoteEditor({ open, initialNote, onClose, onSave }: Props) {
+  const draft = useEditorDraft(
+    'note:' + (initialNote?.id || 'new'),
+    {
+      title: initialNote?.title || '',
+      content: initialNote?.content || '',
+      mood: (initialNote?.mood || '平静') as Mood,
+      audio: undefined as PendingAttachment | undefined,
+    },
+    initialNote,
+  );
+  const { title, content, mood, audio } = draft.value;
+  const setTitle = (value: string) => draft.setField('title', value);
+  const setContent = (value: React.SetStateAction<string>) => draft.setField('content', value);
+  const setMood = (value: Mood) => draft.setField('mood', value);
+  const setAudio = (value: PendingAttachment | undefined) => draft.setField('audio', value);
+  const [mediaStarting, setMediaStarting] = useState(false);
+  const [recordingStopping, setRecordingStopping] = useState(false);
+  const savingRef = useRef(false);
   const [recording, setRecording] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -56,15 +71,6 @@ export function NoteSheet({
   const recorderRef = useRef<MediaRecorder | undefined>(undefined);
   const recognitionRef = useRef<SpeechRecognitionLike | undefined>(undefined);
   const chunksRef = useRef<Blob[]>([]);
-
-  useEffect(() => {
-    if (!open) return;
-    setTitle(initialNote?.title || '');
-    setContent(initialNote?.content || '');
-    setMood(initialNote?.mood || '平静');
-    setAudio(undefined);
-    setError('');
-  }, [open, initialNote]);
 
   useEffect(
     () => () => {
@@ -74,17 +80,9 @@ export function NoteSheet({
     [],
   );
 
-  useEffect(() => {
-    if (open) return;
-    recognitionRef.current?.stop();
-    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
-    recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
-    setRecording(false);
-    setDictating(false);
-  }, [open]);
-
   async function toggleRecording() {
     if (recording) {
+      setRecordingStopping(true);
       recorderRef.current?.stop();
       setRecording(false);
       return;
@@ -93,6 +91,7 @@ export function NoteSheet({
       setError('当前浏览器不支持录音，请换用最新版 Chrome、Edge 或 Safari。');
       return;
     }
+    setMediaStarting(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -110,6 +109,7 @@ export function NoteSheet({
           file: new File([blob], `note-${id}.${extension}`, { type }),
         });
         stream.getTracks().forEach((track) => track.stop());
+        setRecordingStopping(false);
       };
       recorderRef.current = recorder;
       recorder.start();
@@ -117,6 +117,8 @@ export function NoteSheet({
       setError('');
     } catch {
       setError('没有获得麦克风权限，请在浏览器设置中允许后重试。');
+    } finally {
+      setMediaStarting(false);
     }
   }
 
@@ -153,7 +155,9 @@ export function NoteSheet({
     setError('');
   }
 
+  const mediaBusy = recording || dictating || mediaStarting || recordingStopping;
   async function save() {
+    if (savingRef.current || mediaBusy || !draft.ready) return;
     if (!content.trim() && !audio && !initialNote?.audio) {
       setError('写一点内容或录一段语音后再保存。');
       return;
@@ -169,110 +173,116 @@ export function NoteSheet({
       createdAt: initialNote?.createdAt || now,
       updatedAt: initialNote ? now : undefined,
     };
+    savingRef.current = true;
     setSaving(true);
     try {
       await onSave(note, audio);
+      await draft.complete();
     } catch {
       setError('保存失败，请重试。');
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
   return (
-    <Drawer
-      opened={open}
-      onClose={onClose}
-      title={initialNote ? '编辑随记' : '记录此刻'}
-      position="bottom"
-      size="min(92vh, 760px)"
-      radius="xl"
-      overlayProps={{ backgroundOpacity: 0.42, blur: 3 }}
+    <EditorSheet
+      draft={draft}
+      color="blue"
+      onClose={() => {
+        if (!savingRef.current && !mediaBusy && draft.ready) void draft.close(onClose);
+      }}
+      onSave={() => void save()}
+      saveLabel="保存随记"
+      canSave={!!(content.trim() || audio || initialNote?.audio) && !mediaBusy}
+      busy={saving || mediaBusy}
+      error={error}
+      title={initialNote ? '编辑随记' : '记一下'}
     >
-      <Stack gap="md">
-        <SegmentedControl
-          fullWidth
-          size="xs"
-          color="grape"
-          value={`${moodData.find((item) => item.endsWith(mood))}`}
-          onChange={(value) => setMood(moodFromLabel(value))}
-          data={moodData}
-        />
-        <TextInput
-          label="标题（选填）"
-          placeholder="不填会自动取正文第一句"
-          value={title}
-          onChange={(event) => setTitle(event.currentTarget.value)}
-        />
-        <Textarea
-          label="想说的话"
-          placeholder="写下来，或者用下面的语音转文字…"
-          minRows={6}
-          autosize
-          value={content}
-          onChange={(event) => setContent(event.currentTarget.value)}
-        />
-        <Group grow>
-          <Button
-            color={dictating ? 'red' : 'grape'}
-            variant={dictating ? 'filled' : 'light'}
-            leftSection={dictating ? <MicOff size={18} /> : <Sparkles size={18} />}
-            onClick={toggleDictation}
-          >
-            {dictating ? '停止转写' : '语音转文字'}
-          </Button>
-          <Button
-            color={recording ? 'red' : 'blue'}
-            variant={recording ? 'filled' : 'light'}
-            leftSection={recording ? <MicOff size={18} /> : <Mic size={18} />}
-            onClick={() => void toggleRecording()}
-          >
-            {recording ? '结束录音' : '录一段语音'}
-          </Button>
-        </Group>
-        <Text size="xs" c="dimmed">
-          语音转文字的可用性取决于浏览器；录音和随记会保存在本机，并随备份一起导出。
-        </Text>
-        {audio && (
-          <Group
-            justify="space-between"
-            p="sm"
-            bg="var(--mantine-color-blue-light)"
-            style={{ borderRadius: 12 }}
-          >
-            <Text size="sm">已录好一段语音</Text>
+      <Fieldset variant="unstyled" disabled={saving || !draft.ready}>
+        <Stack gap="md">
+          <Textarea
+            label="想说的话"
+            placeholder="写下来，或者用下面的语音转文字…"
+            minRows={6}
+            autosize
+            value={content}
+            onChange={(event) => setContent(event.currentTarget.value)}
+          />
+          <Group grow>
             <Button
-              size="compact-xs"
-              color="red"
-              variant="subtle"
-              leftSection={<Trash2 size={14} />}
-              onClick={() => setAudio(undefined)}
+              type="button"
+              mih={44}
+              color={dictating ? 'red' : 'blue'}
+              variant={dictating ? 'filled' : 'light'}
+              leftSection={dictating ? <MicOff size={18} /> : <Sparkles size={18} />}
+              onClick={toggleDictation}
             >
-              移除
+              {dictating ? '停止转写' : '语音转文字'}
+            </Button>
+            <Button
+              type="button"
+              mih={44}
+              color={recording ? 'red' : 'blue'}
+              variant={recording ? 'filled' : 'light'}
+              leftSection={recording ? <MicOff size={18} /> : <Mic size={18} />}
+              onClick={() => void toggleRecording()}
+            >
+              {recording ? '结束录音' : '录一段语音'}
             </Button>
           </Group>
-        )}
-        {initialNote?.audio && !audio && (
-          <Text size="sm" c="dimmed">
-            已保留原有录音；重新录音后会替换。
+          <Text size="xs" c="dimmed">
+            语音转文字的可用性取决于浏览器；录音和随记会保存在本机，并随备份一起导出。
           </Text>
-        )}
-        {error && (
-          <Text role="alert" c="red" size="sm">
-            {error}
-          </Text>
-        )}
-        <Button
-          color="grape"
-          size="md"
-          loading={saving}
-          disabled={recording}
-          leftSection={<Save size={18} />}
-          onClick={() => void save()}
-        >
-          保存随记
-        </Button>
-      </Stack>
-    </Drawer>
+          <details className="note-options">
+            <summary>标题与心情（选填）</summary>
+            <Stack gap="md" mt="md">
+              <TextInput
+                label="标题（选填）"
+                placeholder="不填会自动取正文第一句"
+                value={title}
+                onChange={(event) => setTitle(event.currentTarget.value)}
+              />
+              <SegmentedControl
+                aria-label="心情"
+                fullWidth
+                size="xs"
+                color="blue"
+                value={`${moodData.find((item) => item.endsWith(mood))}`}
+                onChange={(value) => setMood(moodFromLabel(value))}
+                data={moodData}
+              />
+            </Stack>
+          </details>
+          {audio && (
+            <Group
+              justify="space-between"
+              p="sm"
+              bg="var(--mantine-color-blue-light)"
+              style={{ borderRadius: 12 }}
+            >
+              <Text size="sm">已录好一段语音</Text>
+              <Button
+                type="button"
+                mih={44}
+                size="compact-xs"
+                color="red"
+                variant="subtle"
+                leftSection={<Trash2 size={14} />}
+                onClick={() => setAudio(undefined)}
+              >
+                移除
+              </Button>
+            </Group>
+          )}
+          {initialNote?.audio && !audio && (
+            <Text size="sm" c="dimmed">
+              已保留原有录音；重新录音后会替换。
+            </Text>
+          )}
+        </Stack>
+      </Fieldset>
+    </EditorSheet>
   );
 }

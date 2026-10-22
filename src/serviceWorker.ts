@@ -83,7 +83,7 @@ export async function configurePeriodicReminders(enabled: boolean): Promise<void
 }
 
 export function registerServiceWorker() {
-  if (!('serviceWorker' in navigator)) return;
+  if (import.meta.env.DEV || !('serviceWorker' in navigator)) return;
 
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!updateRequested) return;

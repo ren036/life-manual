@@ -1,3 +1,4 @@
+import { resetTaskView } from './usePageState';
 import { useState } from 'react';
 import {
   insertDocument,
@@ -24,7 +25,13 @@ import type { AppStore } from './useAppData';
 
 type SavedItem = Recipe | DocumentItem | TaskItem;
 export type Editor =
-  | { kind: 'record'; mode: AddMode; item?: SavedItem; relatedRecord?: RelatedRecordRef }
+  | {
+      kind: 'record';
+      mode: AddMode;
+      item?: SavedItem;
+      relatedRecord?: RelatedRecordRef;
+      defaultTask?: { title: string; dueDate?: string };
+    }
   | { kind: 'note'; item?: NoteEntry }
   | { kind: 'cooking'; recipe: Recipe; record?: CookingRecord };
 
@@ -35,8 +42,11 @@ export function useEditor(
 ) {
   const [editor, setEditor] = useState<Editor | null>(null);
   const closeEditor = () => setEditor(null);
-  const startAdd = (mode: AddMode, relatedRecord?: RelatedRecordRef) =>
-    setEditor({ kind: 'record', mode, relatedRecord });
+  const startAdd = (
+    mode: AddMode,
+    relatedRecord?: RelatedRecordRef,
+    defaultTask?: { title: string; dueDate?: string },
+  ) => setEditor({ kind: 'record', mode, relatedRecord, defaultTask });
   const startNote = (item?: NoteEntry) => setEditor({ kind: 'note', item });
   const startCooking = (recipe: Recipe, record?: CookingRecord) =>
     setEditor({ kind: 'cooking', recipe, record });
@@ -47,7 +57,7 @@ export function useEditor(
 
   async function saveItem(item: SavedItem, files: PendingAttachment[]) {
     if (editor?.kind !== 'record') return;
-    const { item: previous, mode } = editor;
+    const { item: previous, mode, relatedRecord } = editor;
     if (previous) {
       if ('completed' in item && 'completed' in previous) await updateTask(item);
       else if (!('completed' in item) && !('completed' in previous))
@@ -62,7 +72,10 @@ export function useEditor(
       else if (mode === 'documents') await insertDocument(item as DocumentItem, files);
       else await insertTask(item as TaskItem);
       await refresh();
-      setTab(mode);
+      if (mode === 'tasks' && !relatedRecord) {
+        resetTaskView();
+        setTab(mode);
+      } else if (mode !== 'tasks') openRecord(mode, item.id);
       toast('已经保存好了');
     }
     closeEditor();

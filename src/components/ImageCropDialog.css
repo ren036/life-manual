@@ -35,7 +35,7 @@
 }
 
 .image-crop-selection:focus-visible {
-  outline: 3px solid var(--mantine-color-green-4);
+  outline: 3px solid var(--mantine-color-blue-4);
   outline-offset: -5px;
 }
 

@@ -38,7 +38,7 @@ export function AttachmentPreview({
   return url ? (
     <Image src={url} alt={alt} w="100%" h="100%" fit="cover" />
   ) : (
-    <Center w="100%" h="100%" c="green">
+    <Center w="100%" h="100%" c="blue">
       <ImageIcon aria-hidden="true" />
     </Center>
   );

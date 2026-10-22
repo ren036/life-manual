@@ -1,79 +1,51 @@
+import './mobile.css';
 import {
   ActionIcon,
-  Box,
   Button,
   Group,
-  Paper,
-  Stack,
   Text,
-  Title,
   useComputedColorScheme,
   useMantineColorScheme,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { ArrowLeft, Moon, Pencil, Settings, Sun, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import type { ReactNode } from 'react';
+import { ArrowLeft, BookOpen, Pencil, Plus, Search } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { matchPath, Navigate, useLocation, useNavigate, useRoutes } from 'react-router';
 import { AddRecordSheet } from './components/AddRecordSheet';
 import { BottomNav } from './components/BottomNav';
 import { CookingRecordSheet } from './components/CookingRecordSheet';
 import { OrganizeSheet } from './components/OrganizeSheet';
 import { NoteSheet } from './components/NoteSheet';
-import { SettingsSheet } from './components/SettingsSheet';
 import { TrashSheet } from './components/TrashSheet';
 import { WelcomeGuide } from './components/WelcomeGuide';
+import { RecordActionsMenu } from './components/RecordActionsMenu';
 import { useAppData } from './hooks/useAppData';
 import { useBackup } from './hooks/useBackup';
 import { useDeleteActions } from './hooks/useDeleteActions';
 import { useEditor } from './hooks/useEditor';
+import {
+  rememberPageScroll,
+  resetTaskView,
+  usePageScroll,
+  usePageState,
+} from './hooks/usePageState';
 import { useReminders } from './hooks/useReminders';
 import { useTaskActions } from './hooks/useTaskActions';
 import { useTrash } from './hooks/useTrash';
-import { DocumentsPage } from './pages/DocumentsPage';
-import { HomePage } from './pages/HomePage';
-import { NotesPage } from './pages/NotesPage';
-import { RecipesPage } from './pages/RecipesPage';
+import { useRecentRecords } from './hooks/useRecentRecords';
+import { TodayPage } from './pages/TodayPage';
+import { RecordsPage } from './pages/RecordsPage';
+import { NoteDetailPage } from './pages/NoteDetailPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { RecordDetailPage } from './pages/RecordDetailPage';
 import { TasksPage } from './pages/TasksPage';
+import { libraryRecords, type LibraryRecord } from './library';
 import { relatedRecordKey } from './relatedRecords';
 import { onAppUpdateAvailable } from './serviceWorker';
-import type { AddMode, AppTab } from './types';
-
+import type { AppTab } from './types';
 interface InstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
-const titles: Record<AppTab, string> = {
-  home: '生活手册',
-  notes: '随记与心情',
-  recipes: '我的菜谱',
-  documents: '资料库',
-  tasks: '待办事项',
-};
-function HeaderButton({
-  icon,
-  label,
-  onClick,
-  color = 'gray',
-}: {
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-  color?: string;
-}) {
-  return (
-    <ActionIcon
-      variant="subtle"
-      color={color}
-      size={36}
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-    >
-      {icon}
-    </ActionIcon>
-  );
 }
 export default function App() {
   const { setColorScheme } = useMantineColorScheme();
@@ -82,16 +54,36 @@ export default function App() {
   const navigate = useNavigate();
   const detailMatch =
     matchPath('/recipes/:id', location.pathname) ?? matchPath('/documents/:id', location.pathname);
-  const route = {
-    tab: (['notes', 'recipes', 'documents', 'tasks'].find(
-      (item) => location.pathname === `/${item}` || location.pathname.startsWith(`/${item}/`),
-    ) || 'home') as AppTab,
-    id: detailMatch?.params.id,
+  const noteMatch = matchPath('/notes/:id', location.pathname);
+  const isDetail = !!(detailMatch || noteMatch);
+  const tab: AppTab =
+    location.pathname === '/profile'
+      ? 'profile'
+      : location.pathname === '/tasks'
+        ? 'tasks'
+        : location.pathname === '/'
+          ? 'home'
+          : 'records';
+  const setTab = (next: AppTab) => {
+    rememberPageScroll(location.pathname + location.search);
+    const target =
+      next === 'home'
+        ? '/'
+        : next === 'recipes'
+          ? '/records?type=recipe'
+          : next === 'documents'
+            ? '/records?type=document'
+            : next === 'notes'
+              ? '/records?type=note'
+              : '/' + next;
+    navigate(target);
   };
-  const tab = route.tab;
-  const setTab = (next: AppTab) => navigate(next === 'home' ? '/' : `/${next}`);
-  const openRecord = (kind: 'recipes' | 'documents', id: string) =>
-    navigate(`/${kind}/${encodeURIComponent(id)}`);
+  const openRecord = (kind: 'recipes' | 'documents' | 'notes', id: string) => {
+    rememberPageScroll(location.pathname + location.search);
+    const path = '/' + kind + '/' + encodeURIComponent(id);
+    if (path !== location.pathname)
+      navigate(path, { state: { returnTo: location.pathname + location.search } });
+  };
   const data = useAppData();
   const {
     recipes,
@@ -104,7 +96,7 @@ export default function App() {
     completeOnboarding,
     organizeItems,
   } = data;
-  const [panel, setPanel] = useState<'settings' | 'organize' | 'trash' | null>(null);
+  const [panel, setPanel] = useState<'organize' | 'trash' | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent>();
 
@@ -145,7 +137,7 @@ export default function App() {
             </Button>
           </Group>
         ),
-        color: 'green',
+        color: 'blue',
         radius: 'lg',
         withBorder: true,
         withCloseButton: false,
@@ -154,9 +146,7 @@ export default function App() {
     });
   }, []);
 
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [location.pathname]);
+  usePageScroll(location.pathname + location.search, !loading);
   useEffect(() => {
     const goOnline = () => setOnline(true);
     const goOffline = () => setOnline(false);
@@ -182,25 +172,68 @@ export default function App() {
       setPanel(null);
     }
   }
-  const detailItem = route.id
-    ? (tab === 'recipes' ? recipes : documents).find((item) => item.id === route.id)
+
+  const recordData = { recipes, documents, notes };
+  const records = useMemo(() => libraryRecords(recordData), [recipes, documents, notes]);
+  const { recent, remember } = useRecentRecords(records);
+  const [libraryKind] = usePageState('library:kind', 'all');
+  const libraryParams = new URLSearchParams(location.search);
+  const selectedKind =
+    libraryParams.get('type') || (libraryParams.has('search') ? 'all' : libraryKind);
+  const detailItem = detailMatch?.params.id
+    ? (location.pathname.startsWith('/recipes/') ? recipes : documents).find(
+        (item) => item.id === detailMatch.params.id,
+      )
     : undefined;
-  const floatingMode: AddMode =
-    tab === 'recipes' || tab === 'documents' || tab === 'tasks' ? tab : 'tasks';
+  const noteItem = noteMatch?.params.id
+    ? notes.find((item) => item.id === noteMatch.params.id)
+    : undefined;
+  useEffect(() => {
+    if (detailItem)
+      remember(
+        'ingredients' in detailItem
+          ? { kind: 'recipe', item: detailItem }
+          : { kind: 'document', item: detailItem },
+      );
+    else if (noteItem) remember({ kind: 'note', item: noteItem });
+  }, [location.pathname, detailItem?.id, noteItem?.id]);
+  const onOpenLibrary = (record: LibraryRecord) =>
+    openRecord(
+      record.kind === 'recipe' ? 'recipes' : record.kind === 'document' ? 'documents' : 'notes',
+      record.item.id,
+    );
+  function addRecord(kind: string) {
+    if (kind === 'document') startAdd('documents');
+    else if (kind === 'recipe') startAdd('recipes');
+    else startNote();
+  }
   const relatedRecordLabels: Record<string, string> = Object.fromEntries([
     ...recipes.map((item) => [
       relatedRecordKey({ kind: 'recipe', id: item.id }),
-      `菜谱 · ${item.title}`,
+      '菜谱 · ' + item.title,
     ]),
     ...documents.map((item) => [
       relatedRecordKey({ kind: 'document', id: item.id }),
-      `资料 · ${item.title}`,
+      '资料 · ' + item.title,
     ]),
   ]);
   const relatedRecordOptions = Object.entries(relatedRecordLabels).map(([value, label]) => ({
     value,
     label,
   }));
+  const settings = {
+    notificationsEnabled,
+    onToggleNotifications: toggleNotifications,
+    onExport: downloadBackup,
+    onImport: restoreBackup,
+    installAvailable: !!installPrompt,
+    onInstall: installApp,
+    trashCount: trashItems.length,
+    onOpenTrash: () => void openTrash(),
+    lastBackupAt,
+    onOpenOrganize: () => setPanel('organize'),
+    onClearData: confirmClearAllData,
+  };
   const detailPage = detailItem ? (
     <RecordDetailPage
       item={detailItem}
@@ -214,63 +247,63 @@ export default function App() {
           task.relatedRecord.kind === ('ingredients' in detailItem ? 'recipe' : 'document'),
       )}
       onCreateRelatedTask={(item) =>
-        startAdd('tasks', {
-          kind: 'ingredients' in item ? 'recipe' : 'document',
-          id: item.id,
-        })
+        startAdd(
+          'tasks',
+          { kind: 'ingredients' in item ? 'recipe' : 'document', id: item.id },
+          {
+            title: 'ingredients' in item ? '准备做' + item.title : item.title + '到期提醒',
+            dueDate: 'expiryDate' in item ? item.expiryDate : undefined,
+          },
+        )
       }
     />
   ) : (
-    <Text ta="center" c="dimmed" py="xl">
-      找不到这条记录，请返回列表。
-    </Text>
+    <div className="empty-library">
+      <h2>没有找到这条记录</h2>
+      <Button variant="light" onClick={() => setTab('records')}>
+        回到记录
+      </Button>
+    </div>
   );
   const page = useRoutes([
     {
       path: '/',
       element: (
-        <HomePage
-          recipes={recipes}
-          documents={documents}
+        <TodayPage
+          records={records}
+          recent={recent}
           tasks={tasks}
-          onNavigate={setTab}
-          onAdd={startAdd}
-          onOpenRecipe={(item) => openRecord('recipes', item.id)}
-          onOpenDocument={(item) => openRecord('documents', item.id)}
+          documents={documents}
+          busyTaskIds={busyTaskIds}
+          onOpenRecord={onOpenLibrary}
+          onEditTask={startEdit}
+          onToggleTask={toggleTask}
+          onAddNote={() => startNote()}
+          onAddDocument={() => startAdd('documents')}
+          onAddTask={() => startAdd('tasks')}
+          onViewTasks={() => {
+            resetTaskView();
+            setTab('tasks');
+          }}
+          onViewRecords={() => setTab('records')}
           backupOverdue={backupOverdue}
           onBackup={downloadBackup}
         />
       ),
     },
-    { path: '/home', element: <Navigate to="/" replace /> },
     {
-      path: '/notes',
-      element: (
-        <NotesPage
-          notes={notes}
-          onAdd={() => startNote()}
-          onEdit={startNote}
-          onDelete={(item) => void removeNote(item)}
-        />
-      ),
+      path: '/records',
+      element: <RecordsPage data={recordData} onOpen={onOpenLibrary} onAdd={addRecord} />,
     },
     {
-      path: '/recipes',
+      path: '/profile',
       element: (
-        <RecipesPage
-          recipes={recipes}
-          onAdd={() => startAdd('recipes')}
-          onOpen={(item) => openRecord('recipes', item.id)}
-        />
-      ),
-    },
-    {
-      path: '/documents',
-      element: (
-        <DocumentsPage
-          documents={documents}
-          onAdd={() => startAdd('documents')}
-          onOpen={(item) => openRecord('documents', item.id)}
+        <ProfilePage
+          recordCount={records.length}
+          pendingCount={tasks.filter((task) => !task.completed).length}
+          dark={dark}
+          onToggleTheme={() => setColorScheme(dark ? 'light' : 'dark')}
+          settings={settings}
         />
       ),
     },
@@ -294,166 +327,157 @@ export default function App() {
     },
     { path: '/recipes/:id', element: detailPage },
     { path: '/documents/:id', element: detailPage },
+    {
+      path: '/notes/:id',
+      element: noteItem ? (
+        <NoteDetailPage note={noteItem} />
+      ) : (
+        <div className="empty-library">
+          <h2>没有找到这条随记</h2>
+          <Button onClick={() => setTab('records')}>回到记录</Button>
+        </div>
+      ),
+    },
+    { path: '/home', element: <Navigate to="/" replace /> },
+    { path: '/notes', element: <Navigate to="/records?type=note" replace /> },
+    { path: '/recipes', element: <Navigate to="/records?type=recipe" replace /> },
+    { path: '/documents', element: <Navigate to="/records?type=document" replace /> },
     { path: '*', element: <Navigate to="/" replace /> },
   ]);
+  const editDetail = () => {
+    if (detailItem) startEdit(detailItem);
+    else if (noteItem) startNote(noteItem);
+  };
+  const deleteDetail = () => {
+    if (detailItem) void removeRecord(detailItem);
+    else if (noteItem) {
+      void removeNote(noteItem);
+      setTab('notes');
+    }
+  };
   return (
-    <Box component="main" bg="var(--app-frame)" mih="100vh">
-      <Paper w="100%" maw={480} mx="auto" mih="100vh" radius={0} shadow="xl" bg="var(--app-bg)">
-        {!online && (
-          <Paper radius={0} p="xs" bg="var(--mantine-color-orange-light)">
-            <Text ta="center" size="xs" c="orange.9">
-              当前离线，仍可查看和编辑本机记录
-            </Text>
-          </Paper>
-        )}
-        <Box
-          component="header"
-          pos="sticky"
-          top={online ? 0 : 38}
-          px="md"
-          py={10}
-          bg="var(--app-header)"
-          style={{ zIndex: 20 }}
-        >
-          <Group justify="space-between" wrap="nowrap" mih={44}>
-            <Group gap="xs" wrap="nowrap">
-              {route.id && (
-                <HeaderButton
-                  icon={<ArrowLeft size={20} />}
-                  label="返回列表"
-                  onClick={() => setTab(tab)}
+    <div className="app-shell">
+      <BottomNav active={tab} onChange={setTab} onAdd={() => startNote()} />
+      <div className="app-workspace">
+        <header className="app-topbar">
+          {isDetail ? (
+            <div className="detail-toolbar">
+              <div>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  size={44}
+                  onClick={() => (location.state?.returnTo ? navigate(-1) : setTab('records'))}
+                  aria-label="返回上一页"
+                >
+                  <ArrowLeft size={21} />
+                </ActionIcon>
+                <span>
+                  {noteMatch ? '随记' : location.pathname.startsWith('/recipes/') ? '菜谱' : '资料'}
+                </span>
+              </div>
+              <div>
+                <Button
+                  variant="subtle"
+                  color="gray"
+                  size="compact-sm"
+                  leftSection={<Pencil size={15} />}
+                  onClick={editDetail}
+                  disabled={!detailItem && !noteItem}
+                >
+                  编辑
+                </Button>
+                <RecordActionsMenu
+                  title={detailItem?.title || noteItem?.title || '记录'}
+                  onEdit={editDetail}
+                  onDelete={deleteDetail}
+                  disabled={!detailItem && !noteItem}
                 />
-              )}
-              <Stack gap={1}>
-                <Text c={dark ? 'green.3' : 'green.7'} size="xs" fw={700}>
-                  {route.id
-                    ? titles[tab]
-                    : tab === 'home'
-                      ? new Intl.DateTimeFormat('zh-CN', {
-                          month: 'long',
-                          day: 'numeric',
-                          weekday: 'short',
-                        }).format(new Date())
-                      : '生活手册'}
-                </Text>
-                <Title order={1} size={24} lh={1.15}>
-                  {route.id ? (tab === 'recipes' ? '菜谱详情' : '资料详情') : titles[tab]}
-                </Title>
-              </Stack>
-            </Group>
-            <Group gap={2} wrap="nowrap">
-              {route.id ? (
-                detailItem && (
-                  <>
-                    <HeaderButton
-                      icon={<Pencil size={17} />}
-                      label="编辑记录"
-                      onClick={() => startEdit(detailItem)}
-                    />
-                    <HeaderButton
-                      icon={<Trash2 size={17} />}
-                      label="删除记录"
-                      color="red"
-                      onClick={() => removeRecord(detailItem)}
-                    />
-                  </>
-                )
-              ) : (
-                <>
-                  <HeaderButton
-                    icon={
-                      dark ? (
-                        <Sun className="theme-toggle-icon" size={19} />
-                      ) : (
-                        <Moon className="theme-toggle-icon" size={19} />
-                      )
-                    }
-                    label={dark ? '开灯' : '关灯'}
-                    color={dark ? 'yellow' : 'gray'}
-                    onClick={() => setColorScheme(dark ? 'light' : 'dark')}
-                  />
-                  <HeaderButton
-                    icon={<Settings size={19} />}
-                    label="打开设置"
-                    onClick={() => setPanel('settings')}
-                  />
-                </>
-              )}
-            </Group>
-          </Group>
-        </Box>
-        <Box px="sm" pt="sm" pb={108}>
-          {loading && (
-            <Text ta="center" c="dimmed" py="xl">
-              正在整理你的记录…
-            </Text>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button type="button" className="topbar-brand" onClick={() => setTab('home')}>
+                <BookOpen size={21} strokeWidth={1.6} />
+                生活手册
+              </button>
+              <ActionIcon
+                size={44}
+                color="gray"
+                variant="subtle"
+                aria-label="搜索全部记录"
+                onClick={() => navigate('/records?search=1')}
+              >
+                <Search size={21} strokeWidth={1.6} />
+              </ActionIcon>
+            </>
           )}
-          {!loading && page}
-        </Box>
-        <BottomNav
-          active={tab}
-          onChange={setTab}
-          onAdd={
-            !route.id && tab !== 'home'
-              ? tab === 'notes'
-                ? () => startNote()
-                : () => startAdd(floatingMode)
-              : undefined
-          }
-        />
-        <NoteSheet
-          open={editor?.kind === 'note'}
-          initialNote={editor?.kind === 'note' ? editor.item : undefined}
-          onClose={closeEditor}
-          onSave={saveNote}
-        />
-        <AddRecordSheet
-          initialItem={editor?.kind === 'record' ? editor.item : undefined}
-          open={editor?.kind === 'record'}
-          mode={editor?.kind === 'record' ? editor.mode : 'tasks'}
-          onClose={closeEditor}
-          onSave={saveItem}
-          relatedRecordOptions={relatedRecordOptions}
-          defaultRelatedRecord={editor?.kind === 'record' ? editor.relatedRecord : undefined}
-        />
-        <CookingRecordSheet
-          open={editor?.kind === 'cooking'}
-          recipeTitle={editor?.kind === 'cooking' ? editor.recipe.title : ''}
-          initialRecord={editor?.kind === 'cooking' ? editor.record : undefined}
-          onClose={closeEditor}
-          onSave={addCookingRecord}
-        />
-        <SettingsSheet
-          open={panel === 'settings'}
-          notificationsEnabled={notificationsEnabled}
-          onClose={() => setPanel(null)}
-          onToggleNotifications={toggleNotifications}
-          onExport={downloadBackup}
-          onImport={restoreBackup}
-          installAvailable={!!installPrompt}
-          onInstall={installApp}
-          trashCount={trashItems.length}
-          onOpenTrash={() => void openTrash()}
-          lastBackupAt={lastBackupAt}
-          onOpenOrganize={() => setPanel('organize')}
-          onClearData={confirmClearAllData}
-        />
-        <OrganizeSheet
-          open={panel === 'organize'}
-          data={{ recipes, documents, tasks, notes }}
-          onClose={() => setPanel(null)}
-          onApply={organizeItems}
-        />
-        <TrashSheet
-          open={panel === 'trash'}
-          entries={trashItems}
-          onClose={() => setPanel(null)}
-          onRestore={(entry) => void restoreFromTrash(entry)}
-          onDelete={permanentlyRemoveFromTrash}
-          onEmpty={confirmEmptyTrash}
-        />
-        <WelcomeGuide open={onboardingOpen} onComplete={completeOnboarding} />
-      </Paper>
-    </Box>
+        </header>
+        {!online && <div className="offline-notice">当前离线，仍可查看和编辑本机记录</div>}
+        <main className={'app-page' + (isDetail ? ' detail-page' : '')} data-page={tab}>
+          {loading ? (
+            <Text ta="center" c="dimmed" py="xl">
+              正在打开你的手册…
+            </Text>
+          ) : (
+            page
+          )}
+        </main>
+        {!isDetail && (tab === 'records' || tab === 'tasks') && (
+          <Button
+            className="capture-fab"
+            leftSection={<Plus size={19} />}
+            onClick={() => (tab === 'tasks' ? startAdd('tasks') : addRecord(selectedKind))}
+          >
+            {tab === 'tasks'
+              ? '添一件待办'
+              : selectedKind === 'document'
+                ? '保存资料'
+                : selectedKind === 'recipe'
+                  ? '记一道菜'
+                  : '记一下'}
+          </Button>
+        )}
+      </div>
+      <NoteSheet
+        open={editor?.kind === 'note'}
+        initialNote={editor?.kind === 'note' ? editor.item : undefined}
+        onClose={closeEditor}
+        onSave={saveNote}
+      />
+      <AddRecordSheet
+        initialItem={editor?.kind === 'record' ? editor.item : undefined}
+        open={editor?.kind === 'record'}
+        mode={editor?.kind === 'record' ? editor.mode : 'tasks'}
+        onClose={closeEditor}
+        onSave={saveItem}
+        relatedRecordOptions={relatedRecordOptions}
+        defaultRelatedRecord={editor?.kind === 'record' ? editor.relatedRecord : undefined}
+        defaultTask={editor?.kind === 'record' ? editor.defaultTask : undefined}
+      />
+      <CookingRecordSheet
+        open={editor?.kind === 'cooking'}
+        recipeId={editor?.kind === 'cooking' ? editor.recipe.id : ''}
+        recipeTitle={editor?.kind === 'cooking' ? editor.recipe.title : ''}
+        initialRecord={editor?.kind === 'cooking' ? editor.record : undefined}
+        onClose={closeEditor}
+        onSave={addCookingRecord}
+      />
+      <OrganizeSheet
+        open={panel === 'organize'}
+        data={{ recipes, documents, tasks, notes }}
+        onClose={() => setPanel(null)}
+        onApply={organizeItems}
+      />
+      <TrashSheet
+        open={panel === 'trash'}
+        entries={trashItems}
+        onClose={() => setPanel(null)}
+        onRestore={(entry) => void restoreFromTrash(entry)}
+        onDelete={permanentlyRemoveFromTrash}
+        onEmpty={confirmEmptyTrash}
+      />
+      <WelcomeGuide open={onboardingOpen} onComplete={completeOnboarding} />
+    </div>
   );
 }

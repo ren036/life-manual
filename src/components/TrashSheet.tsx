@@ -66,7 +66,7 @@ export function TrashSheet({
               <Group gap={2} wrap="nowrap">
                 <ActionIcon
                   variant="light"
-                  color="green"
+                  color="blue"
                   onClick={() => onRestore(entry)}
                   aria-label={`恢复：${entry.item.title}`}
                 >

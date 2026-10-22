@@ -1,6 +1,7 @@
 import { Badge, Button, Center, Group, Paper, Stack, Text, ThemeIcon } from '@mantine/core';
 import { CalendarClock, FileText, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { usePageState } from '../hooks/usePageState';
 import { AttachmentPreview } from '../components/AttachmentPreview';
 import { CollectionToolbar, FilterChips } from '../components/CollectionToolbar';
 import { dueLabel, dueStatus } from '../dueDates';
@@ -15,9 +16,9 @@ export function DocumentsPage({
   onOpen: (item: DocumentItem) => void;
   onAdd: () => void;
 }) {
-  const [filter, setFilter] = useState('all');
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<SortMode>('最近添加');
+  const [filter, setFilter] = usePageState('documents:filter', 'all');
+  const [query, setQuery] = usePageState('documents:query', '');
+  const [sort, setSort] = usePageState<SortMode>('documents:sort', '最近添加');
   const categories = [
     { value: 'all', label: '全部' },
     { value: 'special:important', label: '重要' },
@@ -51,7 +52,7 @@ export function DocumentsPage({
                       : item.category === filter.slice(9)) &&
             `${item.title} ${item.description} ${item.ocrText || ''} ${item.category} ${(item.tags || []).join(' ')}`
               .toLowerCase()
-              .includes(query.toLowerCase()),
+              .includes(query.trim().toLowerCase()),
         )
         .sort((a, b) =>
           sort === '名称排序'
@@ -79,6 +80,9 @@ export function DocumentsPage({
         ]}
       />
       <FilterChips value={filter} onChange={setFilter} options={categories} />
+      <Text size="xs" c="dimmed" role="status">
+        {shown.length} 份资料{query.trim() || filter !== 'all' ? '符合条件' : ''}
+      </Text>
       <Stack gap="sm">
         {shown.map((item) => (
           <Paper
@@ -99,9 +103,9 @@ export function DocumentsPage({
                 w={62}
                 h={62}
                 radius="md"
-                bg="var(--mantine-color-green-light)"
+                bg="var(--mantine-color-blue-light)"
                 withBorder
-                style={{ overflow: 'hidden' }}
+                style={{ overflow: 'hidden', flexShrink: 0 }}
               >
                 {item.hasFile && item.isImage ? (
                   <AttachmentPreview
@@ -111,11 +115,11 @@ export function DocumentsPage({
                   />
                 ) : (
                   <Center w="100%" h="100%">
-                    <FileText color="var(--mantine-color-green-7)" />
+                    <FileText color="var(--mantine-color-blue-7)" />
                   </Center>
                 )}
               </Paper>
-              <Stack gap={3} flex={1}>
+              <Stack gap={3} flex={1} miw={0}>
                 <Group gap="xs">
                   <Badge variant="light" size="xs">
                     {item.category}
@@ -154,7 +158,20 @@ export function DocumentsPage({
       {!shown.length && (
         <Paper bg="var(--app-surface)" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
-            <Text c="dimmed">{documents.length ? '这个分类还没有资料。' : '还没有保存资料。'}</Text>
+            <Text c="dimmed">
+              {documents.length ? '没有符合当前搜索和筛选的资料。' : '还没有保存资料。'}
+            </Text>
+            {!!documents.length && (query.trim() || filter !== 'all') && (
+              <Button
+                variant="light"
+                onClick={() => {
+                  setQuery('');
+                  setFilter('all');
+                }}
+              >
+                清除搜索和筛选
+              </Button>
+            )}
             {!documents.length && <Button onClick={onAdd}>上传第一份资料</Button>}
           </Stack>
         </Paper>

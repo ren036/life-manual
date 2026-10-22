@@ -25,6 +25,7 @@ import { ReactNode, useEffect, useState } from 'react';
 
 interface Props {
   open: boolean;
+  embedded?: boolean;
   notificationsEnabled: boolean;
   onClose: () => void;
   onToggleNotifications: () => void;
@@ -56,6 +57,7 @@ function formatDeploymentTime(value: string) {
 
 export function SettingsSheet({
   open,
+  embedded = false,
   notificationsEnabled,
   onClose,
   onToggleNotifications,
@@ -96,7 +98,7 @@ export function SettingsSheet({
     title,
     description,
     onClick,
-    color = 'green',
+    color = 'blue',
   }: {
     icon: ReactNode;
     title: string;
@@ -104,7 +106,7 @@ export function SettingsSheet({
     onClick: () => void;
     color?: string;
   }) => (
-    <UnstyledButton w="100%" onClick={onClick}>
+    <UnstyledButton className="settings-action" w="100%" onClick={onClick}>
       <Paper withBorder radius="md" p="sm">
         <Group wrap="nowrap">
           <ThemeIcon color={color} variant="light" radius="xl">
@@ -122,99 +124,92 @@ export function SettingsSheet({
       </Paper>
     </UnstyledButton>
   );
-  return (
-    <Drawer
-      opened={open}
-      onClose={onClose}
-      title="设置与数据"
-      position="bottom"
-      size="min(88vh, 680px)"
-      radius="xl"
-      overlayProps={{ backgroundOpacity: 0.42, blur: 3 }}
-    >
-      <Stack gap="sm">
-        <Text c="dimmed" size="xs">
-          数据只保存在当前设备
-        </Text>
-        <Paper withBorder radius="lg" p="md">
-          <Group gap="sm" mb="sm">
-            <ThemeIcon variant="light" radius="xl">
-              <HardDrive size={18} />
-            </ThemeIcon>
-            <Stack gap={0}>
-              <Text fw={650} size="sm">
-                本机存储
-              </Text>
-              <Text c="dimmed" size="xs">
-                已用 {formatBytes(usage)} / 可用额度 {formatBytes(quota)}
-              </Text>
-            </Stack>
-          </Group>
-          <Progress value={percent} radius="xl" aria-label={`已使用 ${percent}%`} />
-        </Paper>
-        {installAvailable && (
-          <Action
-            icon={<MonitorDown size={18} />}
-            title="安装到主屏幕"
-            description="像普通应用一样快速打开"
-            onClick={onInstall}
-          />
+  const content = (
+    <Stack className="settings-content" gap="sm">
+      <Text c="dimmed" size="xs">
+        数据只保存在当前设备
+      </Text>
+      <Paper withBorder radius="lg" p="md">
+        <Group gap="sm" mb="sm">
+          <ThemeIcon variant="light" radius="xl">
+            <HardDrive size={18} />
+          </ThemeIcon>
+          <Stack gap={0}>
+            <Text fw={650} size="sm">
+              本机存储
+            </Text>
+            <Text c="dimmed" size="xs">
+              已用 {formatBytes(usage)} / 可用额度 {formatBytes(quota)}
+            </Text>
+          </Stack>
+        </Group>
+        <Progress value={percent} radius="xl" aria-label={`已使用 ${percent}%`} />
+      </Paper>
+      {installAvailable && (
+        <Action
+          icon={<MonitorDown size={18} />}
+          title="安装到主屏幕"
+          description="像普通应用一样快速打开"
+          onClick={onInstall}
+        />
+      )}
+      <Action
+        icon={notificationsEnabled ? <Bell size={18} /> : <BellOff size={18} />}
+        title="到期通知"
+        description={notificationsEnabled ? '已开启；支持的浏览器可每日后台检查' : '已关闭'}
+        onClick={onToggleNotifications}
+      />
+      <Action
+        icon={<ShieldCheck size={18} />}
+        title="持久化存储"
+        description={persistent ? '已启用，浏览器会尽量保留数据' : '降低浏览器自动清理数据的可能'}
+        onClick={requestPersistence}
+      />
+      <Action
+        icon={<Download size={18} />}
+        title="导出完整备份"
+        description={
+          lastBackupAt
+            ? `上次备份：${new Date(lastBackupAt).toLocaleDateString('zh-CN')}`
+            : '尚未备份；包含记录、待办和附件'
+        }
+        onClick={onExport}
+      />
+      <Action
+        icon={<Tags size={18} />}
+        title="批量整理"
+        description="统一分类并为多条内容追加标签"
+        onClick={onOpenOrganize}
+      />
+      <Action
+        icon={<Trash2 size={18} />}
+        title="回收站"
+        description={trashCount ? `${trashCount} 项内容将在 30 天后自动删除` : '回收站是空的'}
+        onClick={onOpenTrash}
+      />
+      <FileButton accept="application/json,.json" onChange={(file) => file && onImport(file)}>
+        {(props) => (
+          <UnstyledButton {...props} className="settings-action" w="100%">
+            <Paper withBorder radius="md" p="sm">
+              <Group wrap="nowrap">
+                <ThemeIcon variant="light" radius="xl">
+                  <Upload size={18} />
+                </ThemeIcon>
+                <Stack gap={0}>
+                  <Text fw={650} size="sm">
+                    从备份恢复
+                  </Text>
+                  <Text c="dimmed" size="xs">
+                    支持合并或覆盖，失败会自动回滚
+                  </Text>
+                </Stack>
+              </Group>
+            </Paper>
+          </UnstyledButton>
         )}
-        <Action
-          icon={notificationsEnabled ? <Bell size={18} /> : <BellOff size={18} />}
-          title="到期通知"
-          description={notificationsEnabled ? '已开启；支持的浏览器可每日后台检查' : '已关闭'}
-          onClick={onToggleNotifications}
-        />
-        <Action
-          icon={<ShieldCheck size={18} />}
-          title="持久化存储"
-          description={persistent ? '已启用，浏览器会尽量保留数据' : '降低浏览器自动清理数据的可能'}
-          onClick={requestPersistence}
-        />
-        <Action
-          icon={<Download size={18} />}
-          title="导出完整备份"
-          description={
-            lastBackupAt
-              ? `上次备份：${new Date(lastBackupAt).toLocaleDateString('zh-CN')}`
-              : '尚未备份；包含记录、待办和附件'
-          }
-          onClick={onExport}
-        />
-        <Action
-          icon={<Tags size={18} />}
-          title="批量整理"
-          description="统一分类并为多条内容追加标签"
-          onClick={onOpenOrganize}
-        />
-        <Action
-          icon={<Trash2 size={18} />}
-          title="回收站"
-          description={trashCount ? `${trashCount} 项内容将在 30 天后自动删除` : '回收站是空的'}
-          onClick={onOpenTrash}
-        />
-        <FileButton accept="application/json,.json" onChange={(file) => file && onImport(file)}>
-          {(props) => (
-            <UnstyledButton {...props} w="100%">
-              <Paper withBorder radius="md" p="sm">
-                <Group wrap="nowrap">
-                  <ThemeIcon variant="light" radius="xl">
-                    <Upload size={18} />
-                  </ThemeIcon>
-                  <Stack gap={0}>
-                    <Text fw={650} size="sm">
-                      从备份恢复
-                    </Text>
-                    <Text c="dimmed" size="xs">
-                      支持合并或覆盖，失败会自动回滚
-                    </Text>
-                  </Stack>
-                </Group>
-              </Paper>
-            </UnstyledButton>
-          )}
-        </FileButton>
+      </FileButton>
+      <details className="danger-options">
+        <summary>更多数据选项</summary>{' '}
         <Text c="red" size="xs" fw={700} mt="md">
           危险操作
         </Text>
@@ -231,15 +226,30 @@ export function SettingsSheet({
             清除浏览器网站数据仍会删除本机记录，请定期导出备份。
           </Text>
         </Group>
-        {message && (
-          <Text c="green" size="sm" role="status">
-            {message}
-          </Text>
-        )}
-        <Text c="dimmed" size="xs" ta="center" pt="xs">
-          版本 v{__APP_VERSION__} · 上次部署 {formatDeploymentTime(__DEPLOYED_AT__)}
+      </details>
+      {message && (
+        <Text c="blue" size="sm" role="status">
+          {message}
         </Text>
-      </Stack>
+      )}
+      <Text c="dimmed" size="xs" ta="center" pt="xs">
+        生活手册 · v{__APP_VERSION__}
+      </Text>
+    </Stack>
+  );
+  return embedded ? (
+    content
+  ) : (
+    <Drawer
+      opened={open}
+      onClose={onClose}
+      title="设置与数据"
+      position="bottom"
+      size="min(88dvh, 680px)"
+      radius="lg"
+      overlayProps={{ backgroundOpacity: 0.3, blur: 2 }}
+    >
+      {content}
     </Drawer>
   );
 }

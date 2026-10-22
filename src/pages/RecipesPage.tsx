@@ -14,6 +14,7 @@ import {
 } from '@mantine/core';
 import { Check, Clipboard, ShoppingCart, Star, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { usePageState } from '../hooks/usePageState';
 import { recipeCover } from '../attachments';
 import { AttachmentPreview } from '../components/AttachmentPreview';
 import { CollectionToolbar, FilterChips } from '../components/CollectionToolbar';
@@ -25,14 +26,28 @@ export function RecipesPage({
   recipes,
   onOpen,
   onAdd,
+  embedded = false,
+  query: externalQuery,
+  onQueryChange,
+  sort: externalSort,
+  onSortChange,
 }: {
   recipes: Recipe[];
+  embedded?: boolean;
+  query?: string;
+  onQueryChange?: (value: string) => void;
+  sort?: SortMode;
+  onSortChange?: (value: SortMode) => void;
   onOpen: (item: Recipe) => void;
   onAdd: () => void;
 }) {
-  const [filter, setFilter] = useState('all');
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState<SortMode>('最近添加');
+  const [filter, setFilter] = usePageState('recipes:filter', 'all');
+  const [savedQuery, setSavedQuery] = usePageState('recipes:query', '');
+  const query = externalQuery ?? savedQuery;
+  const setQuery = onQueryChange || setSavedQuery;
+  const [savedSort, setSavedSort] = usePageState<SortMode>('recipes:sort', '最近添加');
+  const sort = externalSort ?? savedSort;
+  const setSort = onSortChange || setSavedSort;
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [shoppingOpen, setShoppingOpen] = useState(false);
@@ -66,7 +81,7 @@ export function RecipesPage({
                 : item.category === filter.slice(9)) &&
             `${item.title} ${item.notes} ${item.ingredients.join(' ')} ${(item.tags || []).join(' ')}`
               .toLowerCase()
-              .includes(query.toLowerCase()),
+              .includes(query.trim().toLowerCase()),
         )
         .sort((a, b) =>
           sort === '名称排序' ? a.title.localeCompare(b.title, 'zh-CN') : b.createdAt - a.createdAt,
@@ -106,19 +121,21 @@ export function RecipesPage({
 
   return (
     <Stack gap="md">
-      <CollectionToolbar
-        query={query}
-        onQueryChange={setQuery}
-        searchLabel="搜索菜谱"
-        searchPlaceholder="搜索菜名、食材或标签"
-        sort={sort}
-        onSortChange={(value) => setSort(value as SortMode)}
-        sortLabel="菜谱排序"
-        sortOptions={[
-          { value: '最近添加', label: '最新' },
-          { value: '名称排序', label: '名称' },
-        ]}
-      />
+      {!embedded && (
+        <CollectionToolbar
+          query={query}
+          onQueryChange={setQuery}
+          searchLabel="搜索菜谱"
+          searchPlaceholder="搜索菜名、食材或标签"
+          sort={sort}
+          onSortChange={(value) => setSort(value as SortMode)}
+          sortLabel="菜谱排序"
+          sortOptions={[
+            { value: '最近添加', label: '最新' },
+            { value: '名称排序', label: '名称' },
+          ]}
+        />
+      )}
       <Group justify="space-between" align="center" gap="sm">
         <Text size="xs" c="dimmed">
           {selecting ? '点击菜谱进行多选' : '选几道菜，自动汇总要买的食材'}
@@ -133,6 +150,9 @@ export function RecipesPage({
         </Button>
       </Group>
       <FilterChips value={filter} onChange={setFilter} options={categories} />
+      <Text size="xs" c="dimmed" role="status">
+        {shown.length} 道菜谱{query.trim() || filter !== 'all' ? '符合条件' : ''}
+      </Text>
       {shown.length ? (
         <SimpleGrid cols={2} spacing="sm">
           {shown.map((item, index) => {
@@ -155,12 +175,12 @@ export function RecipesPage({
                 aria-pressed={selecting ? selected : undefined}
                 style={{
                   overflow: 'hidden',
-                  outline: selected ? '2px solid var(--mantine-color-green-6)' : undefined,
+                  outline: selected ? '2px solid var(--mantine-color-blue-6)' : undefined,
                 }}
               >
                 <AspectRatio
                   ratio={4 / 3}
-                  bg={index % 2 ? 'var(--app-cover-warm)' : 'var(--app-cover-green)'}
+                  bg={index % 2 ? 'var(--app-cover-warm)' : 'var(--app-cover-blue)'}
                 >
                   <Box w="100%" h="100%">
                     {cover.available ? (
@@ -169,7 +189,7 @@ export function RecipesPage({
                       <Center w="100%" h="100%">
                         <Text
                           c="var(--app-cover-mark)"
-                          ff="'Songti SC', STSong, SimSun, serif"
+
                           fz={40}
                           lh={1}
                         >
@@ -198,7 +218,7 @@ export function RecipesPage({
                     top={8}
                     left={8}
                     radius="xl"
-                    color={selected ? 'green' : 'gray'}
+                    color={selected ? 'blue' : 'gray'}
                     variant={selected ? 'filled' : 'light'}
                     aria-hidden
                   >
@@ -227,7 +247,20 @@ export function RecipesPage({
       ) : (
         <Paper bg="var(--app-surface)" radius="lg" p="xl" ta="center" withBorder>
           <Stack align="center" gap="sm">
-            <Text c="dimmed">{recipes.length ? '还没有符合条件的菜。' : '还没有记录菜谱。'}</Text>
+            <Text c="dimmed">
+              {recipes.length ? '没有符合当前搜索和筛选的菜谱。' : '还没有记录菜谱。'}
+            </Text>
+            {!!recipes.length && (query.trim() || filter !== 'all') && (
+              <Button
+                variant="light"
+                onClick={() => {
+                  setQuery('');
+                  setFilter('all');
+                }}
+              >
+                清除搜索和筛选
+              </Button>
+            )}
             {!recipes.length && <Button onClick={onAdd}>添加第一道菜</Button>}
           </Stack>
         </Paper>
@@ -239,7 +272,7 @@ export function RecipesPage({
           radius="xl"
           p="sm"
           pos="sticky"
-          bottom={76}
+          bottom="calc(76px + env(safe-area-inset-bottom))"
           style={{ zIndex: 10 }}
         >
           <Group justify="space-between" wrap="nowrap">
@@ -263,7 +296,7 @@ export function RecipesPage({
         opened={shoppingOpen}
         onClose={() => setShoppingOpen(false)}
         position="bottom"
-        size="min(82vh, 680px)"
+        size="min(82dvh, 680px)"
         radius="xl"
         title="采购清单"
         overlayProps={{ backgroundOpacity: 0.42, blur: 3 }}

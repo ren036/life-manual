@@ -1,7 +1,7 @@
 import { notifications } from '@mantine/notifications';
 
 export function toast(message: string) {
-  notifications.show({ message, color: 'green', radius: 'lg', withBorder: true });
+  notifications.show({ message, color: 'blue', radius: 'lg', withBorder: true });
 }
 
 export function errorToast(message: string) {

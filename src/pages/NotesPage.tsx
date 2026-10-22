@@ -1,18 +1,21 @@
 import {
-  ActionIcon,
   Badge,
   Button,
   Group,
+  Input,
   Paper,
-  SegmentedControl,
   Stack,
   Text,
+  TextInput,
+  UnstyledButton,
 } from '@mantine/core';
-import { Mic, Pencil, Trash2 } from 'lucide-react';
+import { Mic, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getAttachmentUrl } from '../storage/database';
+import { usePageState } from '../hooks/usePageState';
+import { FilterChips } from '../components/CollectionToolbar';
+import { RecordActionsMenu } from '../components/RecordActionsMenu';
 import type { Mood, NoteEntry } from '../types';
-
 const moodEmoji: Record<Mood, string> = {
   开心: '😄',
   平静: '😌',
@@ -20,7 +23,6 @@ const moodEmoji: Record<Mood, string> = {
   焦虑: '😟',
   生气: '😤',
 };
-
 function NoteAudio({ id }: { id: string }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
@@ -29,6 +31,7 @@ function NoteAudio({ id }: { id: string }) {
     void getAttachmentUrl(id).then((value) => {
       objectUrl = value || '';
       if (active) setUrl(objectUrl);
+      else if (objectUrl) URL.revokeObjectURL(objectUrl);
     });
     return () => {
       active = false;
@@ -51,67 +54,107 @@ export function NotesPage({
   onEdit: (note: NoteEntry) => void;
   onDelete: (note: NoteEntry) => void;
 }) {
-  const [filter, setFilter] = useState<'全部' | Mood>('全部');
+  const [filter, setFilter] = usePageState('notes:filter', '全部');
+  const [query, setQuery] = usePageState('notes:query', '');
+  const [expanded, setExpanded] = usePageState<string[]>('notes:expanded', []);
   const shown = useMemo(
-    () => notes.filter((note) => filter === '全部' || note.mood === filter),
-    [notes, filter],
+    () =>
+      notes.filter(
+        (note) =>
+          (filter === '全部' || note.mood === filter) &&
+          [note.title, note.content, note.mood]
+            .join(' ')
+            .toLowerCase()
+            .includes(query.trim().toLowerCase()),
+      ),
+    [notes, filter, query],
   );
-
   return (
-    <Stack gap="lg">
-      <Paper radius={28} p="xl" bg="var(--app-notes-hero)" c="white" shadow="md">
-        <Text size="xs" opacity={0.78}>
-          随记
-        </Text>
-        <Text size="xl" fw={750} mt={4}>
-          今天想记下什么？
-        </Text>
-        <Text size="sm" opacity={0.85} mt="xs">
-          {notes.length} 条随记，都只保存在你的设备里
-        </Text>
-      </Paper>
-
-      <SegmentedControl
-        fullWidth
-        size="xs"
-        radius="md"
-        value={filter}
-        onChange={(value) => setFilter(value as '全部' | Mood)}
-        data={['全部', '开心', '平静', '低落', '焦虑', '生气']}
+    <Stack gap="md">
+      <TextInput
+        aria-label="搜索随记"
+        placeholder="搜索标题或正文"
+        value={query}
+        onChange={(event) => setQuery(event.currentTarget.value)}
+        leftSection={<Search size={18} />}
+        rightSection={
+          query ? <Input.ClearButton aria-label="清除搜索" onClick={() => setQuery('')} /> : null
+        }
       />
-
-      <Stack gap="md">
+      <FilterChips
+        value={filter}
+        onChange={setFilter}
+        options={['全部', ...Object.keys(moodEmoji)].map((value) => ({ value, label: value }))}
+      />
+      <Text size="xs" c="dimmed" role="status">
+        {shown.length} 条随记
+        {query.trim() || filter !== '全部' ? '符合条件' : '，只保存在你的设备里'}
+      </Text>
+      <Stack gap="sm">
         {shown.map((note) => (
           <Paper
             component="article"
+            key={note.id}
             bg="var(--app-surface-soft)"
-            shadow="xs"
             radius="lg"
             withBorder
-            p="lg"
-            key={note.id}
+            p="md"
           >
             <Stack gap="sm">
-              <Group justify="space-between" align="flex-start" wrap="nowrap">
-                <Stack gap={2} flex={1}>
-                  <Text fw={700}>{note.title}</Text>
-                  <Text size="xs" c="dimmed">
-                    {new Intl.DateTimeFormat('zh-CN', {
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    }).format(note.createdAt)}
-                  </Text>
+              <Group wrap="nowrap" gap="xs" align="flex-start">
+                <Stack gap={2} miw={0} flex={1}>
+                  <UnstyledButton
+                    mih={44}
+                    onClick={() => onEdit(note)}
+                    aria-label={'编辑随记：' + note.title}
+                  >
+                    <Text fw={700}>{note.title}</Text>
+                  </UnstyledButton>
+                  <Group gap="xs">
+                    <Text size="xs" c="dimmed">
+                      {new Intl.DateTimeFormat('zh-CN', {
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }).format(note.createdAt)}
+                    </Text>
+                    <Badge color="blue" variant="light" radius="xl">
+                      {moodEmoji[note.mood]} {note.mood}
+                    </Badge>
+                  </Group>
                 </Stack>
-                <Badge color="grape" variant="light" radius="xl">
-                  {moodEmoji[note.mood]} {note.mood}
-                </Badge>
+                <RecordActionsMenu
+                  title={note.title}
+                  onEdit={() => onEdit(note)}
+                  onDelete={() => onDelete(note)}
+                />
               </Group>
               {note.content && (
-                <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                <Text
+                  size="sm"
+                  lineClamp={expanded.includes(note.id) ? undefined : 5}
+                  style={{ whiteSpace: 'pre-wrap' }}
+                >
                   {note.content}
                 </Text>
+              )}
+              {(note.content.length > 180 || note.content.split('\n').length > 5) && (
+                <Button
+                  variant="subtle"
+                  color="blue"
+                  size="compact-sm"
+                  w="fit-content"
+                  onClick={() =>
+                    setExpanded((ids) =>
+                      ids.includes(note.id)
+                        ? ids.filter((id) => id !== note.id)
+                        : [...ids, note.id],
+                    )
+                  }
+                >
+                  {expanded.includes(note.id) ? '收起正文' : '展开正文'}
+                </Button>
               )}
               {note.audio && (
                 <Stack gap={4}>
@@ -124,39 +167,34 @@ export function NotesPage({
                   <NoteAudio id={note.audio.id} />
                 </Stack>
               )}
-              <Group justify="flex-end" gap={2}>
-                <ActionIcon
-                  variant="subtle"
-                  color="gray"
-                  onClick={() => onEdit(note)}
-                  aria-label={`编辑：${note.title}`}
-                >
-                  <Pencil size={16} />
-                </ActionIcon>
-                <ActionIcon
-                  variant="subtle"
-                  color="red"
-                  onClick={() => onDelete(note)}
-                  aria-label={`删除：${note.title}`}
-                >
-                  <Trash2 size={16} />
-                </ActionIcon>
-              </Group>
             </Stack>
           </Paper>
         ))}
       </Stack>
-
       {!shown.length && (
-        <Paper bg="var(--app-surface)" radius="lg" p="xl" ta="center" withBorder>
-          <Text c="dimmed" mb="md">
-            {notes.length ? '这个心情下还没有随记。' : '还没有随记，今天感觉怎么样？'}
-          </Text>
-          {!notes.length && (
-            <Button color="grape" onClick={onAdd}>
-              写下第一条
-            </Button>
-          )}
+        <Paper bg="var(--app-surface)" radius="lg" p="lg" ta="center" withBorder>
+          <Stack align="center" gap="sm">
+            <Text c="dimmed">
+              {notes.length ? '没有符合当前搜索和心情的随记。' : '还没有随记，今天感觉怎么样？'}
+            </Text>
+            {(query.trim() || filter !== '全部') && (
+              <Button
+                variant="light"
+                color="blue"
+                onClick={() => {
+                  setQuery('');
+                  setFilter('全部');
+                }}
+              >
+                清除搜索和筛选
+              </Button>
+            )}
+            {!notes.length && (
+              <Button color="blue" onClick={onAdd}>
+                写下第一条
+              </Button>
+            )}
+          </Stack>
         </Paper>
       )}
     </Stack>

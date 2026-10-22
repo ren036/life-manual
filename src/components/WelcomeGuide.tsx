@@ -16,7 +16,7 @@ export function WelcomeGuide({
     {
       icon: <Heart size={28} />,
       title: '欢迎使用生活手册',
-      body: '把菜谱、家庭资料和待办放在一个安静、好找的地方。接下来用一分钟了解数据如何保存。',
+      body: '随手记下，想用时找得到。随记、资料和菜谱都收在「记录」，今天要做的事放在「待办」。',
     },
     {
       icon: <ShieldCheck size={28} />,
@@ -26,7 +26,7 @@ export function WelcomeGuide({
     {
       icon: <Database size={28} />,
       title: '从空白手册开始',
-      body: '初始化后不会添加任何示例内容。你可以从第一道菜、第一份资料或第一个待办开始记录。',
+      body: '从「今天」点一下就能记下想法，也可以保存资料、添加待办。你的手册从第一条真实记录开始。',
     },
   ];
   const page = pages[step];

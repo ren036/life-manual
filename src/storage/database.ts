@@ -24,6 +24,7 @@ const NOTES_STORE = 'notes';
 const SETTINGS_STORE = 'settings';
 const CURRENT_BACKUP_VERSION = 4;
 const PRE_IMPORT_BACKUP_KEY = 'pre-import-backup';
+const EDITOR_DRAFT_PREFIX = 'editor-draft:';
 const DEPRECATED_SEED_IDS = {
   recipes: ['egg-tomato', 'pepper-egg', 'potato-chicken'],
   documents: ['socket', 'invoice'],
@@ -123,6 +124,55 @@ function complete(transaction: IDBTransaction): Promise<void> {
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error || new Error('保存已中止'));
   });
+}
+
+// Serialize draft reads, writes and removal so a late autosave cannot revive a saved draft.
+let draftQueue: Promise<unknown> = Promise.resolve();
+function queueDraft<T>(operation: () => Promise<T>): Promise<T> {
+  const result = draftQueue.catch(() => undefined).then(operation);
+  draftQueue = result;
+  return result;
+}
+
+export function loadEditorDraft<T>(key: string): Promise<T | undefined> {
+  return queueDraft(async () => {
+    const database = await openDatabase();
+    try {
+      return (await requestResult(
+        database
+          .transaction(SETTINGS_STORE)
+          .objectStore(SETTINGS_STORE)
+          .get(EDITOR_DRAFT_PREFIX + key),
+      )) as T | undefined;
+    } finally {
+      database.close();
+    }
+  });
+}
+
+export function saveEditorDraft<T>(key: string, value: T): Promise<void> {
+  return queueDraft(async () => {
+    const database = await openDatabase();
+    try {
+      const transaction = database.transaction(SETTINGS_STORE, 'readwrite');
+      const store = transaction.objectStore(SETTINGS_STORE);
+      if (value === undefined) store.delete(EDITOR_DRAFT_PREFIX + key);
+      else store.put(value, EDITOR_DRAFT_PREFIX + key);
+      await complete(transaction);
+    } finally {
+      database.close();
+    }
+  });
+}
+
+function clearEditorDrafts(store: IDBObjectStore) {
+  const request = store.openCursor();
+  request.onsuccess = () => {
+    const cursor = request.result;
+    if (!cursor) return;
+    if (String(cursor.key).startsWith(EDITOR_DRAFT_PREFIX)) cursor.delete();
+    cursor.continue();
+  };
 }
 
 function toRecipe(record: LegacyRecord): Recipe {
@@ -421,6 +471,7 @@ export async function emptyTrash(): Promise<void> {
 }
 
 export async function clearAllData(): Promise<void> {
+  await draftQueue.catch(() => undefined);
   const database = await openDatabase();
   const stores = [
     RECORDS_STORE,
@@ -430,8 +481,9 @@ export async function clearAllData(): Promise<void> {
     TASKS_STORE,
     NOTES_STORE,
   ];
-  const transaction = database.transaction(stores, 'readwrite');
+  const transaction = database.transaction([...stores, SETTINGS_STORE], 'readwrite');
   stores.forEach((store) => transaction.objectStore(store).clear());
+  clearEditorDrafts(transaction.objectStore(SETTINGS_STORE));
   await complete(transaction);
 }
 

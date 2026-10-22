@@ -103,7 +103,7 @@ function DetailSection({
   children: ReactNode;
 }) {
   return (
-    <Paper component="section" radius="xl" p="lg" bg="var(--app-surface)" shadow="xs">
+    <section className="detail-section">
       <Group justify="space-between" mb="md">
         <Title order={3}>{title}</Title>
         {aside && (
@@ -113,7 +113,7 @@ function DetailSection({
         )}
       </Group>
       {children}
-    </Paper>
+    </section>
   );
 }
 export function RecordDetailPage({
@@ -161,10 +161,9 @@ export function RecordDetailPage({
     }
   }
   return (
-    <Stack gap="md">
-      <Stack component="header" gap="sm" px="xs" py="md">
+    <Stack className="record-detail" gap={0}>
+      <Stack component="header" className="record-detail-header" gap="sm">
         <Group gap="xs">
-          {' '}
           <Badge>{item.category}</Badge>
           {!isRecipe && item.important && <Badge color="yellow">重要资料</Badge>}
           {item.tags?.map((tag) => (
@@ -200,6 +199,11 @@ export function RecordDetailPage({
           </Group>
         </Group>
       </Stack>
+      {!isRecipe && item.expiryDate && (
+        <DetailSection title="到期或保修日期">
+          <Text>{new Date(`${item.expiryDate}T00:00:00`).toLocaleDateString('zh-CN')}</Text>
+        </DetailSection>
+      )}
       {!!attachments.length && (
         <DetailSection
           title={isRecipe ? '成品照片' : '图片与附件'}
@@ -210,6 +214,19 @@ export function RecordDetailPage({
               <DetailAttachment key={attachment.id} attachment={attachment} />
             ))}
           </SimpleGrid>
+        </DetailSection>
+      )}
+      {isRecipe && (
+        <DetailSection title="食材">
+          {item.ingredients.length ? (
+            <Group gap="xs">
+              {item.ingredients.map((ingredient, index) => (
+                <Pill key={index}>{ingredient}</Pill>
+              ))}
+            </Group>
+          ) : (
+            <Text c="dimmed">还没有记录食材</Text>
+          )}
         </DetailSection>
       )}
       {isRecipe && (
@@ -237,7 +254,7 @@ export function RecordDetailPage({
                       <ActionIcon
                         variant="subtle"
                         color="gray"
-                        size="sm"
+                        size={44}
                         onClick={() => onEditCookingRecord?.(item, record)}
                         aria-label={`编辑第 ${cookingRecords.length - index} 次下厨记录`}
                       >
@@ -246,7 +263,7 @@ export function RecordDetailPage({
                       <ActionIcon
                         variant="subtle"
                         color="red"
-                        size="sm"
+                        size={44}
                         onClick={() => onDeleteCookingRecord?.(item, record)}
                         aria-label={`删除第 ${cookingRecords.length - index} 次下厨记录`}
                       >
@@ -264,28 +281,10 @@ export function RecordDetailPage({
               ))
             ) : (
               <Text c="dimmed" ta="center">
-                做完后拍张照片，慢慢看见自己的进步。
+                记下心得或拍张照片，慢慢看见自己的进步。
               </Text>
             )}
           </Stack>
-        </DetailSection>
-      )}
-      {isRecipe && (
-        <DetailSection title="食材">
-          {item.ingredients.length ? (
-            <Group gap="xs">
-              {item.ingredients.map((ingredient, index) => (
-                <Pill key={index}>{ingredient}</Pill>
-              ))}
-            </Group>
-          ) : (
-            <Text c="dimmed">还没有记录食材</Text>
-          )}
-        </DetailSection>
-      )}
-      {!isRecipe && item.expiryDate && (
-        <DetailSection title="到期或保修日期">
-          <Text>{new Date(`${item.expiryDate}T00:00:00`).toLocaleDateString('zh-CN')}</Text>
         </DetailSection>
       )}
       {description && (
@@ -316,14 +315,14 @@ export function RecordDetailPage({
             leftSection={<BellPlus size={18} />}
             onClick={() => onCreateRelatedTask(item)}
           >
-            添加相关待办
+            {isRecipe ? '添加相关待办' : '添加到期提醒'}
           </Button>
           {relatedTasks.map((task) => (
             <Paper withBorder radius="md" p="sm" key={task.id}>
               <Group wrap="nowrap">
                 <ThemeIcon
                   variant={task.completed ? 'filled' : 'light'}
-                  color="green"
+                  color="blue"
                   radius="xl"
                   size="sm"
                 >

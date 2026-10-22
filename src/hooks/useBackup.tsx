@@ -104,7 +104,7 @@ export function useBackup(
           </Stack>
         ),
         labels: { confirm: '开始导入', cancel: '取消' },
-        confirmProps: { color: 'green' },
+        confirmProps: { color: 'blue' },
         onConfirm: async () => {
           try {
             await importBackup(backup, importMode);
