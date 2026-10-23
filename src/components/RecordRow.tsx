@@ -30,19 +30,17 @@ export function RecordRow({
         {image ? (
           <AttachmentPreview id={image} enabled alt={record.item.title} />
         ) : (
-          <Icon size={22} strokeWidth={1.6} />
+          <Icon size={22} strokeWidth={1.7} aria-hidden="true" />
         )}
       </span>
       <span className="record-copy">
-        <span className="record-eyebrow">
-          {kindLabels[record.kind]}
-          <span className="tiny-dot" />
-          {category}
-          {saved && <Bookmark size={12} fill="currentColor" />}
-        </span>
         <span className="record-title">{record.item.title}</span>
         <span className="record-summary">{recordSummary(record)}</span>
         <span className="record-meta">
+          <span>
+            {kindLabels[record.kind]} · {category}
+          </span>
+          <span className="tiny-dot" aria-hidden="true" />
           {record.kind === 'document' && record.item.expiryDate ? (
             <span className={dueStatus(record.item.expiryDate) === 'overdue' ? 'text-danger' : ''}>
               {dueLabel(record.item.expiryDate)}
@@ -52,13 +50,21 @@ export function RecordRow({
           )}
           {record.kind === 'note' && record.item.audio && (
             <>
-              <Mic size={12} />
+              <Mic size={12} aria-hidden="true" />
               语音
             </>
           )}
+          {saved && (
+            <Bookmark
+              size={12}
+              fill="currentColor"
+              role="img"
+              aria-label={record.kind === 'recipe' ? '已收藏' : '重要资料'}
+            />
+          )}
         </span>
       </span>
-      <ChevronRight className="record-chevron" size={16} />
+      <ChevronRight className="record-chevron" size={15} aria-hidden="true" />
     </button>
   );
 }

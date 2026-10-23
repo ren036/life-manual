@@ -1,18 +1,20 @@
-import { ActionIcon, Button, Group, Text, UnstyledButton } from '@mantine/core';
+import { ActionIcon, Button } from '@mantine/core';
 import {
   ArrowDownToLine,
   ArrowRight,
-  Check,
+  CheckCheck,
   Circle,
   FilePlus2,
+  Library,
+  NotebookPen,
   Plus,
-  SquarePen,
+  Utensils,
 } from 'lucide-react';
-import { PageHeading } from '../components/PageHeading';
 import { RecordRow } from '../components/RecordRow';
 import { daysFromDate, taskDueLabel } from '../dueDates';
-import { shortDate, type LibraryRecord } from '../library';
+import type { LibraryRecord } from '../library';
 import type { DocumentItem, TaskItem } from '../types';
+
 interface Props {
   records: LibraryRecord[];
   recent: LibraryRecord[];
@@ -24,12 +26,14 @@ interface Props {
   onToggleTask: (task: TaskItem) => void;
   onAddNote: () => void;
   onAddDocument: () => void;
+  onAddRecipe: () => void;
   onAddTask: () => void;
   onViewTasks: () => void;
   onViewRecords: () => void;
   backupOverdue: boolean;
   onBackup: () => void;
 }
+
 export function TodayPage({
   records,
   recent,
@@ -41,70 +45,78 @@ export function TodayPage({
   onToggleTask,
   onAddNote,
   onAddDocument,
+  onAddRecipe,
   onAddTask,
   onViewTasks,
   onViewRecords,
   backupOverdue,
   onBackup,
 }: Props) {
-  const actionable = tasks
-    .filter((task) => !task.completed && (daysFromDate(task.dueDate) ?? 1) <= 0)
+  const pending = tasks.filter((task) => !task.completed);
+  const actionable = pending
+    .filter((task) => (daysFromDate(task.dueDate) ?? 1) <= 0)
     .sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  const upcoming = pending
+    .filter((task) => (daysFromDate(task.dueDate) ?? 1) > 0)
+    .sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+  const shownTasks = (actionable.length ? actionable : upcoming).slice(0, 4);
   const dueDocuments = documents
     .filter((item) => item.expiryDate && (daysFromDate(item.expiryDate) ?? 31) <= 30)
     .sort((a, b) => (a.expiryDate || '').localeCompare(b.expiryDate || ''))
-    .slice(0, 3);
-  const recentRecords = recent.length
-    ? recent
-    : [...records].sort((a, b) => b.item.createdAt - a.item.createdAt).slice(0, 4);
+    .slice(0, 2);
+  const recentRecords = (
+    recent.length ? recent : [...records].sort((a, b) => b.item.createdAt - a.item.createdAt)
+  ).slice(0, 4);
+  const date = new Intl.DateTimeFormat('zh-CN', {
+    month: 'long',
+    day: 'numeric',
+    weekday: 'long',
+  }).format(new Date());
+
   return (
     <div className="today-page">
-      <PageHeading
-        title="今天"
-        description={new Intl.DateTimeFormat('zh-CN', {
-          month: 'long',
-          day: 'numeric',
-          weekday: 'long',
-        }).format(new Date())}
-        action={
-          <span className="daily-mark">
-            {new Date().getDate().toString().padStart(2, '0')}
-            <small>日常一页</small>
-          </span>
-        }
-      />
-      <button type="button" className="capture-banner" onClick={onAddNote}>
-        <span className="capture-icon">
-          <SquarePen size={25} strokeWidth={1.5} />
-        </span>
-        <span>
-          <strong>记一下</strong>
-          <small>记下刚想到的事</small>
-        </span>
-        <Plus size={23} strokeWidth={1.6} />
-      </button>
-      <div className="quick-links">
-        <button type="button" onClick={onAddDocument}>
-          <FilePlus2 size={17} />
-          保存一份资料
+      <header className="today-intro">
+        <h1>今天</h1>
+        <p className="today-date">{date}</p>
+      </header>
+      <div className="capture-panel">
+        <button type="button" className="capture-input" onClick={onAddNote}>
+          <NotebookPen size={21} aria-hidden="true" />
+          <span>记下一点什么…</span>
+          <Plus size={20} aria-hidden="true" />
         </button>
-        <span />
-        <button type="button" onClick={onAddTask}>
-          <Plus size={17} />
-          添一件待办
-        </button>
-      </div>
-      <section className="today-section">
-        <div className="section-heading">
-          <h2>今天要做</h2>
-          <button type="button" onClick={onViewTasks}>
-            全部待办
-            <ArrowRight size={14} />
+        <div className="capture-shortcuts" aria-label="快速新建">
+          <button type="button" onClick={onAddDocument}>
+            <FilePlus2 size={18} aria-hidden="true" />
+            存资料
+          </button>
+          <button type="button" onClick={onAddRecipe}>
+            <Utensils size={18} aria-hidden="true" />
+            记菜谱
+          </button>
+          <button type="button" onClick={onAddTask}>
+            <Plus size={18} aria-hidden="true" />
+            加待办
           </button>
         </div>
-        {actionable.length ? (
+      </div>
+
+      <section className="today-section">
+        <div className="section-heading">
+          <h2>
+            {actionable.length ? '今天要做' : '接下来'}
+            {pending.length > 0 && (
+              <span className="section-total">{actionable.length || pending.length}</span>
+            )}
+          </h2>
+          <button type="button" onClick={pending.length ? onViewTasks : onAddTask}>
+            {pending.length ? '全部待办' : '添加待办'}
+            <ArrowRight size={15} aria-hidden="true" />
+          </button>
+        </div>
+        {shownTasks.length ? (
           <div className="daily-tasks">
-            {actionable.slice(0, 5).map((task) => (
+            {shownTasks.map((task) => (
               <div className="daily-task" key={task.id}>
                 <ActionIcon
                   size={44}
@@ -115,12 +127,13 @@ export function TodayPage({
                   onClick={() => onToggleTask(task)}
                   aria-label={'完成待办：' + task.title}
                 >
-                  <Circle size={22} strokeWidth={1.5} />
+                  <Circle size={22} strokeWidth={1.6} aria-hidden="true" />
                 </ActionIcon>
                 <button type="button" onClick={() => onEditTask(task)}>
                   <strong>{task.title}</strong>
                   <small className={(daysFromDate(task.dueDate) ?? 0) < 0 ? 'text-danger' : ''}>
                     {taskDueLabel(task.dueDate)}
+                    {task.priority !== '普通' ? ' · ' + task.priority : ''}
                   </small>
                 </button>
               </div>
@@ -129,54 +142,65 @@ export function TodayPage({
         ) : (
           <div className="calm-empty">
             <span className="empty-check">
-              <Check size={19} />
+              <CheckCheck size={23} aria-hidden="true" />
             </span>
             <div>
-              <strong>今天没有到期的待办</strong>
-              <p>有空时，也可以看看接下来的安排。</p>
+              <strong>今天没有临近事项</strong>
+              <p>需要做的事，随手加一条。</p>
             </div>
           </div>
         )}
       </section>
+
       {!!dueDocuments.length && (
         <section className="today-section">
           <div className="section-heading">
-            <h2>资料提醒</h2>
-            <span className="section-count">到期与保修</span>
+            <h2>资料到期提醒</h2>
           </div>
-          {dueDocuments.map((item) => (
-            <RecordRow key={item.id} record={{ kind: 'document', item }} onOpen={onOpenRecord} />
-          ))}
+          <div className="today-records">
+            {dueDocuments.map((item) => (
+              <RecordRow key={item.id} record={{ kind: 'document', item }} onOpen={onOpenRecord} />
+            ))}
+          </div>
         </section>
       )}
+
       <section className="today-section">
         <div className="section-heading">
           <h2>{recent.length ? '最近打开' : '最近记录'}</h2>
           <button type="button" onClick={onViewRecords}>
             全部记录
-            <ArrowRight size={14} />
+            <ArrowRight size={15} aria-hidden="true" />
           </button>
         </div>
         {recentRecords.length ? (
-          recentRecords.map((record) => (
-            <RecordRow key={record.kind + record.item.id} record={record} onOpen={onOpenRecord} />
-          ))
+          <div className="today-records">
+            {recentRecords.map((record) => (
+              <RecordRow key={record.kind + record.item.id} record={record} onOpen={onOpenRecord} />
+            ))}
+          </div>
         ) : (
-          <div className="empty-library">
-            <SquarePen size={26} strokeWidth={1.3} />
-            <h3>从一条小记录开始</h3>
-            <p>随记、家庭资料、喜欢的菜，慢慢收在这里。</p>
-            <Button variant="light" onClick={onAddNote}>
-              写下第一条
+          <div className="daily-library-empty">
+            <span className="empty-symbol">
+              <Library size={25} aria-hidden="true" />
+            </span>
+            <h3>留下一条记录</h3>
+            <p>想法、资料和菜谱，随时回来翻看。</p>
+            <Button
+              variant="light"
+              leftSection={<Plus size={17} aria-hidden="true" />}
+              onClick={onAddNote}
+            >
+              记一下
             </Button>
           </div>
         )}
       </section>
       {backupOverdue && (
         <button type="button" className="backup-reminder" onClick={onBackup}>
-          <ArrowDownToLine size={17} />
-          <span>有一阵子没备份了，保存一份副本吧。</span>
-          <ArrowRight size={15} />
+          <ArrowDownToLine size={17} aria-hidden="true" />
+          <span>该备份了，保存一份手册副本</span>
+          <ArrowRight size={15} aria-hidden="true" />
         </button>
       )}
     </div>

@@ -1,5 +1,16 @@
 import { ActionIcon, Button, Drawer, Menu, TextInput } from '@mantine/core';
-import { ArrowDownUp, Check, ListFilter, Plus, Search, X } from 'lucide-react';
+import {
+  ArrowDownUp,
+  Check,
+  FileText,
+  Library,
+  ListFilter,
+  NotebookPen,
+  Plus,
+  Search,
+  Utensils,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { PageHeading } from '../components/PageHeading';
@@ -8,7 +19,7 @@ import { usePageState } from '../hooks/usePageState';
 import { libraryRecords, recordText, type LibraryRecord, type RecordKind } from '../library';
 import { daysFromDate } from '../dueDates';
 import { RecipesPage } from './RecipesPage';
-import type { AppData, Recipe } from '../types';
+import type { AppData } from '../types';
 type Kind = 'all' | RecordKind;
 const kinds = [
   { value: 'all', label: '全部' },
@@ -107,10 +118,10 @@ export function RecordsPage({ data, onOpen, onAdd }: Props) {
     <div className="records-page">
       <PageHeading
         title="记录"
-        description={all.length + ' 条生活记录'}
+        description={all.length + ' 条'}
         action={
           <Button
-            variant="light"
+            variant="filled"
             size="sm"
             leftSection={<Plus size={17} />}
             onClick={() => onAdd(kind)}
@@ -129,77 +140,94 @@ export function RecordsPage({ data, onOpen, onAdd }: Props) {
             onClick={() => changeKind(item.value)}
           >
             {item.label}
+            {all.length > 0 && (
+              <span className="record-tab-count">
+                {item.value === 'all'
+                  ? all.length
+                  : all.filter((record) => record.kind === item.value).length}
+              </span>
+            )}
           </button>
         ))}
       </div>
-      <div className="library-search">
-        <TextInput
-          ref={input}
-          aria-label="搜索记录"
-          placeholder="搜索标题、正文、食材或文件文字"
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-          leftSection={<Search size={18} />}
-          rightSection={
-            query ? (
-              <ActionIcon
-                variant="subtle"
-                color="gray"
-                onClick={() => setQuery('')}
-                aria-label="清除搜索"
+      <div className="library-controls">
+        <div className="library-search">
+          <TextInput
+            ref={input}
+            aria-label="搜索记录"
+            placeholder="搜索记录"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            leftSection={<Search size={18} />}
+            rightSection={
+              query ? (
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  onClick={() => setQuery('')}
+                  aria-label="清除搜索"
+                >
+                  <X size={16} />
+                </ActionIcon>
+              ) : null
+            }
+          />
+        </div>
+        <div className="library-toolbar">
+          <div>
+            {kind !== 'recipe' && (
+              <button
+                type="button"
+                aria-label={
+                  '筛选记录：' +
+                  (options.find((option) => option.value === filter)?.label || '全部记录')
+                }
+                title="筛选记录"
+                className={filter !== 'all' ? 'is-filtered' : ''}
+                onClick={() => {
+                  setFilterQuery('');
+                  setFilterOpen(true);
+                }}
               >
-                <X size={16} />
-              </ActionIcon>
-            ) : null
-          }
-        />
-      </div>
-      <div className="library-toolbar">
-        <span>
-          {kind === 'recipe'
-            ? '照片、食材与每次下厨'
-            : shown.length + ' 条' + (query.trim() ? '搜索结果' : '记录')}
-        </span>
-        <div>
-          {kind !== 'recipe' && (
-            <button
-              type="button"
-              className={filter !== 'all' ? 'is-filtered' : ''}
-              onClick={() => {
-                setFilterQuery('');
-                setFilterOpen(true);
-              }}
-            >
-              <ListFilter size={15} />
-              {filter === 'all'
-                ? '筛选'
-                : options.find((option) => option.value === filter)?.label || '已筛选'}
-            </button>
-          )}
-          <Menu withinPortal position="bottom-end">
-            <Menu.Target>
-              <button type="button" aria-label="记录排序">
-                <ArrowDownUp size={15} />
-                {sort === 'recent' ? '最近' : '名称'}
+                <ListFilter size={19} aria-hidden="true" />
               </button>
-            </Menu.Target>
-            <Menu.Dropdown>
-              <Menu.Item
-                onClick={() => setSort('recent')}
-                rightSection={sort === 'recent' ? <Check size={15} /> : null}
-              >
-                最近添加
-              </Menu.Item>
-              <Menu.Item
-                onClick={() => setSort('name')}
-                rightSection={sort === 'name' ? <Check size={15} /> : null}
-              >
-                按名称排列
-              </Menu.Item>
-            </Menu.Dropdown>
-          </Menu>
+            )}
+            <Menu withinPortal position="bottom-end">
+              <Menu.Target>
+                <button
+                  type="button"
+                  aria-label="记录排序"
+                  title={sort === 'recent' ? '最近添加' : '按名称排列'}
+                >
+                  <ArrowDownUp size={18} aria-hidden="true" />
+                </button>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item
+                  onClick={() => setSort('recent')}
+                  rightSection={sort === 'recent' ? <Check size={15} /> : null}
+                >
+                  最近添加
+                </Menu.Item>
+                <Menu.Item
+                  onClick={() => setSort('name')}
+                  rightSection={sort === 'name' ? <Check size={15} /> : null}
+                >
+                  按名称排列
+                </Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
+          </div>
         </div>
       </div>
+      {kind !== 'recipe' && (query.trim() || filter !== 'all') && (
+        <p className="library-result-count" role="status">
+          {shown.length} 条结果
+          {filter !== 'all'
+            ? ' · ' + (options.find((option) => option.value === filter)?.label || '已筛选')
+            : ''}
+        </p>
+      )}
       {kind === 'recipe' ? (
         <div className="recipe-library">
           <RecipesPage
@@ -225,32 +253,64 @@ export function RecordsPage({ data, onOpen, onAdd }: Props) {
               再显示 40 条
             </Button>
           )}
-          {!shown.length && (
-            <div className="empty-library">
-              <Search size={27} strokeWidth={1.3} />
-              <h3>{query.trim() || filter !== 'all' ? '没有找到这条记录' : '这里还没有记录'}</h3>
-              <p>
-                {query.trim() || filter !== 'all'
-                  ? '换个关键词，或清除当前筛选试试。'
-                  : '从一张图片、一段文字开始。'}
-              </p>
-              {query.trim() || filter !== 'all' ? (
-                <Button
-                  variant="light"
-                  onClick={() => {
-                    setQuery('');
-                    setFilter('all');
-                  }}
-                >
-                  清除搜索与筛选
-                </Button>
-              ) : (
-                <Button variant="light" onClick={() => onAdd(kind)}>
-                  记下第一条
-                </Button>
-              )}
+          {!shown.length && !all.length && kind === 'all' && !query.trim() && filter === 'all' && (
+            <div className="library-start">
+              <span className="empty-symbol">
+                <Library size={26} aria-hidden="true" />
+              </span>
+              <h2>还没有记录</h2>
+              <p>随记、资料和菜谱，都收在这里。</p>
+              <Button
+                leftSection={<Plus size={17} aria-hidden="true" />}
+                onClick={() => onAdd('note')}
+              >
+                写一条随记
+              </Button>
+              <div className="library-start-options">
+                <button type="button" onClick={() => onAdd('document')}>
+                  <FileText size={17} aria-hidden="true" />
+                  存资料
+                </button>
+                <button type="button" onClick={() => onAdd('recipe')}>
+                  <Utensils size={17} aria-hidden="true" />
+                  记菜谱
+                </button>
+              </div>
             </div>
           )}
+          {!shown.length &&
+            (all.length > 0 || kind !== 'all' || !!query.trim() || filter !== 'all') && (
+              <div className="empty-library">
+                {query.trim() || filter !== 'all' ? (
+                  <Search size={28} aria-hidden="true" />
+                ) : kind === 'document' ? (
+                  <FileText size={28} aria-hidden="true" />
+                ) : (
+                  <NotebookPen size={28} aria-hidden="true" />
+                )}
+                <h3>{query.trim() || filter !== 'all' ? '没有找到这条记录' : '这里还没有记录'}</h3>
+                <p>
+                  {query.trim() || filter !== 'all'
+                    ? '换个关键词，或清除当前筛选试试。'
+                    : '从一张图片、一段文字开始。'}
+                </p>
+                {query.trim() || filter !== 'all' ? (
+                  <Button
+                    variant="light"
+                    onClick={() => {
+                      setQuery('');
+                      setFilter('all');
+                    }}
+                  >
+                    清除搜索与筛选
+                  </Button>
+                ) : (
+                  <Button variant="light" onClick={() => onAdd(kind)}>
+                    记下第一条
+                  </Button>
+                )}
+              </div>
+            )}
         </>
       )}
       <Drawer

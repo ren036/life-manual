@@ -72,17 +72,15 @@ export function TasksPage({
         title="待办"
         description="日常要做的事，放在这里"
         action={
-          <Button variant="light" size="sm" leftSection={<Plus size={17} />} onClick={onAdd}>
+          <Button size="sm" leftSection={<Plus size={17} aria-hidden="true" />} onClick={onAdd}>
             新建
           </Button>
         }
       />
-      <Group justify="space-between">
-        <Text fw={700}>待完成 {pendingCount} 件</Text>
-        <Text size="xs" c="dimmed">
-          已完成 {tasks.length - pendingCount} 件
-        </Text>
-      </Group>
+      <div className="task-summary">
+        <strong>待完成 {pendingCount} 件</strong>
+        <span>已完成 {tasks.length - pendingCount} 件</span>
+      </div>
       <TextInput
         aria-label="搜索待办"
         placeholder="搜索待办、备注或标签"

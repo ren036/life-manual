@@ -271,6 +271,7 @@ export default function App() {
           onToggleTask={toggleTask}
           onAddNote={() => startNote()}
           onAddDocument={() => startAdd('documents')}
+          onAddRecipe={() => startAdd('recipes')}
           onAddTask={() => startAdd('tasks')}
           onViewTasks={() => {
             resetTaskView();

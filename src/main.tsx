@@ -14,7 +14,7 @@ import './redesign.css';
 
 const theme = createTheme({
   primaryColor: 'blue',
-  primaryShade: 7,
+  primaryShade: { light: 7, dark: 6 },
   defaultRadius: 'md',
   radius: { xs: '4px', sm: '6px', md: '10px', lg: '14px', xl: '20px' },
   fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
@@ -33,16 +33,16 @@ const theme = createTheme({
   },
   colors: {
     blue: [
-      '#f1f5f9',
-      '#e3ecf3',
-      '#c9d9e6',
-      '#a9c0d3',
-      '#8ba9c2',
-      '#6d90ae',
-      '#567b9b',
-      '#456681',
-      '#35536c',
-      '#233b51',
+      '#edf2ff',
+      '#dbe5ff',
+      '#bacfff',
+      '#91b2ff',
+      '#6792f5',
+      '#4a78ea',
+      '#3566df',
+      '#2856c9',
+      '#214aad',
+      '#183a8c',
     ],
   },
 });
