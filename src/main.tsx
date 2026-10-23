@@ -18,6 +18,7 @@ const theme = createTheme({
   defaultRadius: 'md',
   radius: { xs: '4px', sm: '6px', md: '10px', lg: '14px', xl: '20px' },
   fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
+  fontSizes: { xs: '13px', sm: '15px', md: '16px', lg: '18px', xl: '21px' },
   headings: {
     fontFamily: '-apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
     fontWeight: '650',

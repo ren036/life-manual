@@ -109,15 +109,14 @@ export function RecordsPage({ data, onOpen, onAdd }: Props) {
         title="记录"
         description={all.length + ' 条生活记录'}
         action={
-          <ActionIcon
-            size={44}
-            variant="subtle"
-            color="blue"
+          <Button
+            variant="light"
+            size="sm"
+            leftSection={<Plus size={17} />}
             onClick={() => onAdd(kind)}
-            aria-label="新增记录"
           >
-            <Plus size={22} />
-          </ActionIcon>
+            {kind === 'document' ? '存资料' : kind === 'recipe' ? '记菜谱' : '记一下'}
+          </Button>
         }
       />
       <div className="record-tabs" role="tablist" aria-label="记录类型">

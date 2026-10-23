@@ -8,7 +8,7 @@ import {
   useMantineColorScheme,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { ArrowLeft, BookOpen, Pencil, Plus, Search } from 'lucide-react';
+import { ArrowLeft, BookOpen, Pencil, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { matchPath, Navigate, useLocation, useNavigate, useRoutes } from 'react-router';
 import { AddRecordSheet } from './components/AddRecordSheet';
@@ -23,12 +23,7 @@ import { useAppData } from './hooks/useAppData';
 import { useBackup } from './hooks/useBackup';
 import { useDeleteActions } from './hooks/useDeleteActions';
 import { useEditor } from './hooks/useEditor';
-import {
-  rememberPageScroll,
-  resetTaskView,
-  usePageScroll,
-  usePageState,
-} from './hooks/usePageState';
+import { rememberPageScroll, resetTaskView, usePageScroll } from './hooks/usePageState';
 import { useReminders } from './hooks/useReminders';
 import { useTaskActions } from './hooks/useTaskActions';
 import { useTrash } from './hooks/useTrash';
@@ -176,10 +171,6 @@ export default function App() {
   const recordData = { recipes, documents, notes };
   const records = useMemo(() => libraryRecords(recordData), [recipes, documents, notes]);
   const { recent, remember } = useRecentRecords(records);
-  const [libraryKind] = usePageState('library:kind', 'all');
-  const libraryParams = new URLSearchParams(location.search);
-  const selectedKind =
-    libraryParams.get('type') || (libraryParams.has('search') ? 'all' : libraryKind);
   const detailItem = detailMatch?.params.id
     ? (location.pathname.startsWith('/recipes/') ? recipes : documents).find(
         (item) => item.id === detailMatch.params.id,
@@ -423,21 +414,6 @@ export default function App() {
             page
           )}
         </main>
-        {!isDetail && (tab === 'records' || tab === 'tasks') && (
-          <Button
-            className="capture-fab"
-            leftSection={<Plus size={19} />}
-            onClick={() => (tab === 'tasks' ? startAdd('tasks') : addRecord(selectedKind))}
-          >
-            {tab === 'tasks'
-              ? '添一件待办'
-              : selectedKind === 'document'
-                ? '保存资料'
-                : selectedKind === 'recipe'
-                  ? '记一道菜'
-                  : '记一下'}
-          </Button>
-        )}
       </div>
       <NoteSheet
         open={editor?.kind === 'note'}

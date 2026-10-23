@@ -12,7 +12,7 @@ import {
   TextInput,
   UnstyledButton,
 } from '@mantine/core';
-import { Check, Circle, Link2, Search } from 'lucide-react';
+import { Check, Circle, Link2, Plus, Search } from 'lucide-react';
 import { useMemo } from 'react';
 import { compareTasksByDueDate, dueStatus, taskDueLabel } from '../dueDates';
 import { repeatLabel } from '../recurrence';
@@ -68,7 +68,15 @@ export function TasksPage({
   );
   return (
     <Stack className="task-page" gap="md">
-      <PageHeading title="待办" description="日常要做的事，放在这里" />
+      <PageHeading
+        title="待办"
+        description="日常要做的事，放在这里"
+        action={
+          <Button variant="light" size="sm" leftSection={<Plus size={17} />} onClick={onAdd}>
+            新建
+          </Button>
+        }
+      />
       <Group justify="space-between">
         <Text fw={700}>待完成 {pendingCount} 件</Text>
         <Text size="xs" c="dimmed">

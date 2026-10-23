@@ -5,15 +5,16 @@
   --app-surface: #fff;
   --app-surface-soft: #f2f5f7;
   --app-ink: #26313c;
-  --app-muted: #7c8791;
-  --app-line: #e6eaed;
-  --app-accent: #456681;
+  --app-muted: #536372;
+  --app-line: #dce3e8;
+  --app-accent: #355b79;
   --app-accent-soft: #eaf0f5;
   --app-cover-blue: #edf1f4;
   --app-cover-warm: #f0f0ed;
-  --app-cover-mark: #a1afb9;
+  --app-cover-mark: #657787;
   --mantine-color-body: #fcfcfb;
   --mantine-color-text: #26313c;
+  --mantine-color-dimmed: #536372;
 }
 :root[data-mantine-color-scheme='dark'] {
   --app-frame: #10151b;
@@ -22,8 +23,8 @@
   --app-surface: #1d252e;
   --app-surface-soft: #222d38;
   --app-ink: #e2e8ee;
-  --app-muted: #94a1ae;
-  --app-line: #303c48;
+  --app-muted: #b3c0cc;
+  --app-line: #3b4957;
   --app-accent: #a3bed3;
   --app-accent-soft: #253747;
   --app-cover-blue: #25323e;
@@ -31,6 +32,7 @@
   --app-cover-mark: #72899b;
   --mantine-color-body: #181e25;
   --mantine-color-text: #e2e8ee;
+  --mantine-color-dimmed: #b3c0cc;
 }
 body {
   color: var(--app-ink);
@@ -41,6 +43,11 @@ button,
 input,
 textarea {
   font: inherit;
+}
+.mantine-Input-input::placeholder,
+.mantine-Textarea-input::placeholder {
+  color: var(--app-muted);
+  opacity: 1;
 }
 button {
   -webkit-tap-highlight-color: transparent;
@@ -55,7 +62,7 @@ a:focus-visible {
   display: flex;
   align-items: center;
   color: var(--app-muted);
-  font-size: 13px;
+  font-size: 15px;
   cursor: pointer;
 }
 .note-options summary::before {
@@ -109,7 +116,7 @@ a:focus-visible {
 }
 .sidebar-brand small {
   display: block;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: 0.06em;
   color: var(--app-muted);
@@ -130,7 +137,7 @@ a:focus-visible {
   border-radius: 8px;
   background: none;
   color: var(--app-muted);
-  font-size: 14px;
+  font-size: 16px;
   text-align: left;
   cursor: pointer;
 }
@@ -151,11 +158,11 @@ a:focus-visible {
   background: var(--app-surface);
   color: var(--app-ink);
   cursor: pointer;
-  font-size: 13px;
+  font-size: 15px;
 }
 .sidebar-footnote {
   margin-top: auto;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--app-muted);
   display: flex;
   align-items: center;
@@ -189,7 +196,7 @@ a:focus-visible {
   align-items: center;
   gap: 9px;
   color: var(--app-muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 550;
   border: 0;
   background: none;
@@ -224,12 +231,12 @@ a:focus-visible {
 }
 .page-description {
   color: var(--app-muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
   margin: 8px 0 0;
 }
 .page-eyebrow {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--app-accent);
   letter-spacing: 0.1em;
   margin: 0 0 7px;
@@ -245,7 +252,7 @@ a:focus-visible {
 }
 .daily-mark small {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   line-height: 1.5;
   letter-spacing: 0.13em;
   color: var(--app-muted);
@@ -280,7 +287,7 @@ a:focus-visible {
 }
 .capture-banner small {
   display: block;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--app-muted);
   margin-top: 6px;
 }
@@ -306,7 +313,7 @@ a:focus-visible {
   color: var(--app-muted);
   border: 0;
   background: none;
-  font-size: 12px;
+  font-size: 14px;
   cursor: pointer;
 }
 .today-section {
@@ -321,7 +328,7 @@ a:focus-visible {
 }
 .section-heading h2,
 .profile-section-title {
-  font-size: 15px;
+  font-size: 17px;
   letter-spacing: -0.025em;
   font-weight: 650;
   margin: 0;
@@ -329,7 +336,7 @@ a:focus-visible {
 .section-heading > button {
   border: 0;
   background: none;
-  font-size: 11px;
+  font-size: 14px;
   color: var(--app-muted);
   display: flex;
   align-items: center;
@@ -338,7 +345,7 @@ a:focus-visible {
   cursor: pointer;
 }
 .section-count {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--app-muted);
 }
 .calm-empty {
@@ -357,13 +364,13 @@ a:focus-visible {
   color: var(--app-muted);
 }
 .calm-empty strong {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 550;
 }
 .calm-empty p {
   margin: 5px 0 0;
   color: var(--app-muted);
-  font-size: 11px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .daily-task {
@@ -384,13 +391,13 @@ a:focus-visible {
 }
 .daily-task strong {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 550;
   overflow-wrap: anywhere;
 }
 .daily-task small {
   display: block;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--app-muted);
   margin-top: 5px;
 }
@@ -399,8 +406,8 @@ a:focus-visible {
   align-items: center;
   gap: 15px;
   width: 100%;
-  min-height: 105px;
-  padding: 18px 0;
+  min-height: 116px;
+  padding: 20px 0;
   text-align: left;
   color: var(--app-ink);
   border: 0;
@@ -443,13 +450,13 @@ a:focus-visible {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 }
 .record-eyebrow {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 9px;
+  font-size: 13px;
   color: var(--app-muted);
 }
 .tiny-dot {
@@ -462,7 +469,7 @@ a:focus-visible {
   vertical-align: middle;
 }
 .record-title {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -472,7 +479,7 @@ a:focus-visible {
   overflow: hidden;
 }
 .record-summary {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--app-muted);
   line-height: 1.7;
   display: -webkit-box;
@@ -484,7 +491,7 @@ a:focus-visible {
   -webkit-line-clamp: 2;
 }
 .record-meta {
-  font-size: 9px;
+  font-size: 13px;
   line-height: 1.6;
   color: var(--app-muted);
   display: flex;
@@ -494,7 +501,7 @@ a:focus-visible {
 }
 .record-chevron {
   color: var(--app-muted);
-  opacity: 0.55;
+  opacity: 0.8;
   flex-shrink: 0;
 }
 .record-tabs {
@@ -509,7 +516,7 @@ a:focus-visible {
   position: relative;
   min-height: 44px;
   padding: 0 2px 11px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   color: var(--app-muted);
   cursor: pointer;
@@ -531,7 +538,7 @@ a:focus-visible {
   border: 1px solid transparent;
   background: var(--app-surface-soft);
   min-height: 44px;
-  font-size: 13px;
+  font-size: 15px;
 }
 .library-toolbar {
   display: flex;
@@ -542,7 +549,7 @@ a:focus-visible {
 }
 .library-toolbar > span {
   color: var(--app-muted);
-  font-size: 10px;
+  font-size: 13px;
 }
 .library-toolbar > div {
   display: flex;
@@ -553,7 +560,7 @@ a:focus-visible {
   align-items: center;
   gap: 5px;
   min-height: 40px;
-  font-size: 10px;
+  font-size: 13px;
   color: var(--app-muted);
   border: 0;
   background: none;
@@ -576,7 +583,7 @@ a:focus-visible {
   border: 0;
   border-bottom: 1px solid var(--app-line);
   background: none;
-  font-size: 14px;
+  font-size: 16px;
   text-align: left;
   cursor: pointer;
   color: var(--app-ink);
@@ -600,7 +607,7 @@ a:focus-visible {
   margin: 0 0 9px;
 }
 .empty-library p {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.9;
   margin: 0 auto 20px;
   max-width: 260px;
@@ -615,7 +622,7 @@ a:focus-visible {
   align-items: center;
   padding: 20px 0;
   margin-top: 24px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--app-muted);
   text-align: left;
   cursor: pointer;
@@ -644,13 +651,13 @@ a:focus-visible {
   font-weight: 500;
 }
 .recipe-library .mantine-Button-root {
-  font-size: 11px;
+  font-size: 13px;
 }
 .recipe-library .filter-chips {
   border-bottom: 1px solid var(--app-line);
 }
 .recipe-library .filter-chips > button {
-  font-size: 11px;
+  font-size: 13px;
   min-height: 38px;
 }
 .detail-toolbar {
@@ -667,7 +674,7 @@ a:focus-visible {
 }
 .detail-toolbar > div:first-child {
   margin-left: -10px;
-  font-size: 12px;
+  font-size: 14px;
   color: var(--app-muted);
 }
 .detail-page {
@@ -689,7 +696,7 @@ a:focus-visible {
 }
 .record-detail-header .mantine-Button-root {
   min-height: 36px;
-  font-size: 11px;
+  font-size: 13px;
 }
 .detail-section {
   padding: 25px 0;
@@ -714,24 +721,24 @@ a:focus-visible {
   line-height: 1.85;
 }
 .detail-section .mantine-Button-root {
-  font-size: 12px;
+  font-size: 14px;
 }
 .detail-kicker {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--app-muted);
 }
 .detail-date {
   color: var(--app-muted);
-  font-size: 11px;
+  font-size: 14px;
   margin: 0 0 31px;
 }
 .note-body {
   white-space: pre-wrap;
   line-height: 1.95;
-  font-size: 16px;
+  font-size: 17px;
   overflow-wrap: anywhere;
   padding-bottom: 30px;
 }
@@ -778,12 +785,12 @@ a:focus-visible {
 }
 .personal-mark span {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--app-muted);
   margin-top: 7px;
 }
 .privacy-note {
-  font-size: 11px;
+  font-size: 14px;
   color: var(--app-muted);
   line-height: 1.9;
   background: var(--app-surface-soft);
@@ -805,13 +812,13 @@ a:focus-visible {
 }
 .profile-preferences strong {
   display: block;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 550;
 }
 .profile-preferences span {
   display: block;
   margin-top: 5px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--app-muted);
 }
 .profile-section-title {
@@ -844,18 +851,18 @@ a:focus-visible {
   color: var(--app-muted);
 }
 .settings-action .mantine-Text-root:first-child {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 550;
 }
 .settings-action .mantine-Text-root:last-child {
-  font-size: 10px;
+  font-size: 13px;
   margin-top: 4px;
 }
 .danger-options {
   margin: 22px 0 12px;
 }
 .danger-options > summary {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--app-muted);
   cursor: pointer;
   padding: 10px 0;
@@ -864,20 +871,11 @@ a:focus-visible {
   margin: 8px 0 15px;
 }
 .offline-notice {
-  font-size: 11px;
+  font-size: 13px;
   padding: 9px 20px;
   background: var(--app-accent-soft);
   color: var(--app-accent);
   text-align: center;
-}
-.capture-fab {
-  position: fixed;
-  bottom: 28px;
-  right: max(calc((100vw - 1040px) / 2), 30px);
-  min-height: 46px;
-  padding: 0 18px;
-  box-shadow: 0 5px 18px rgb(20 40 60 / 10%);
-  z-index: 10;
 }
 .text-danger {
   color: var(--mantine-color-red-7) !important;
@@ -898,11 +896,6 @@ a:focus-visible {
     background: var(--app-accent-soft);
   }
 }
-@media (min-width: 900px) {
-  .capture-fab {
-    display: none;
-  }
-}
 @media (min-width: 1280px) {
   .app-shell {
     border-left: 1px solid var(--app-line);
@@ -910,9 +903,6 @@ a:focus-visible {
   }
 }
 @media (max-width: 899px) {
-  .records-page .page-heading .mantine-ActionIcon-root {
-    display: none;
-  }
   body {
     background: var(--app-bg);
   }
@@ -930,7 +920,7 @@ a:focus-visible {
   }
   .topbar-brand {
     color: var(--app-ink);
-    font-size: 13px;
+    font-size: 15px;
     letter-spacing: -0.03em;
   }
   .topbar-brand svg {
@@ -985,18 +975,11 @@ a:focus-visible {
     cursor: pointer;
   }
   .mobile-navigation button span {
-    font-size: 9px;
+    font-size: 13px;
   }
   .mobile-navigation button[aria-current='page'] {
     color: var(--app-accent);
     font-weight: 650;
-  }
-  .capture-fab {
-    bottom: calc(81px + env(safe-area-inset-bottom));
-    right: max(calc((100vw - 674px) / 2), 23px);
-    min-height: 45px;
-    font-size: 12px;
-    border-radius: 9px;
   }
   .record-tabs {
     gap: 27px;
@@ -1037,13 +1020,13 @@ a:focus-visible {
     gap: 25px;
   }
   .record-title {
-    font-size: 14px;
+    font-size: 16px;
   }
   .record-row {
     gap: 10px;
   }
   .quick-links button {
-    font-size: 11px;
+    font-size: 14px;
     gap: 6px;
   }
 }
